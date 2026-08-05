@@ -1,14 +1,14 @@
 import os
 import re
-import sqlite3
 import platform
+import hashlib
 from PIL import Image
 import pypdf
 import pytesseract
 from pdf2image import convert_from_path
 import streamlit as st
 import pandas as pd
-import hashlib
+import sqlalchemy
 
 # Automatic path detection for Windows vs Cloud (Linux)
 if platform.system() == "Windows":
@@ -23,79 +23,102 @@ else:
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Initialize SQLite Database & Tables ---
+# --- Database Engine Configuration (Cloud PostgreSQL or Local SQLite Fallback) ---
+if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
+    DB_URL = st.secrets["postgres"]["url"]
+else:
+    DB_URL = "sqlite:///logistics_audits.db"
+
+engine = sqlalchemy.create_engine(DB_URL)
+
+# --- Initialize Database Tables ---
 def init_db():
-    conn = sqlite3.connect("logistics_audits.db")
-    cursor = conn.cursor()
-    
-    # Audits Table with username column
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS audits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT,
-            tracking_id TEXT,
-            container_no TEXT,
-            port TEXT,
-            date TEXT,
-            status TEXT,
-            username TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    
-    # Users Table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT,
-            role TEXT
-        )
-    """)
-    
-    # Create default admin account if not exists (username: admin, password: password123)
-    cursor.execute("SELECT * FROM users WHERE username = 'admin'")
-    if not cursor.fetchone():
-        hashed_pwd = make_hashes("password123")
-        cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("admin", hashed_pwd, "Admin"))
+    with engine.begin() as conn:
+        # Check dialect to use correct auto-increment syntax
+        if "sqlite" in DB_URL:
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS audits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT,
+                    tracking_id TEXT,
+                    container_no TEXT,
+                    port TEXT,
+                    date TEXT,
+                    status TEXT,
+                    username TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    username TEXT PRIMARY KEY,
+                    password TEXT,
+                    role TEXT
+                )
+            """))
+        else:
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS audits (
+                    id SERIAL PRIMARY KEY,
+                    filename TEXT,
+                    tracking_id TEXT,
+                    container_no TEXT,
+                    port TEXT,
+                    date TEXT,
+                    status TEXT,
+                    username TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    username TEXT PRIMARY KEY,
+                    password TEXT,
+                    role TEXT
+                )
+            """))
         
-    conn.commit()
-    conn.close()
+        # Create default admin account if not exists
+        result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
+        if not result:
+            hashed_pwd = make_hashes("password123")
+            conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
+                         {"u": "admin", "p": hashed_pwd, "r": "Admin"})
 
 init_db()
 
 def add_user(username, password, role="User"):
-    conn = sqlite3.connect("logistics_audits.db")
-    cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (username, make_hashes(password), role))
-        conn.commit()
-        conn.close()
+        with engine.begin() as conn:
+            conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
+                         {"u": username, "p": make_hashes(password), "r": role})
         return True
-    except sqlite3.IntegrityError:
-        conn.close()
+    except Exception:
         return False
 
 def login_user(username, password):
-    conn = sqlite3.connect("logistics_audits.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT password, role FROM users WHERE username = ?", (username,))
-    result = cursor.fetchone()
-    conn.close()
-    if result:
-        stored_password, role = result
-        if stored_password == make_hashes(password):
-            return role
+    with engine.connect() as conn:
+        result = conn.execute(sqlalchemy.text("SELECT password, role FROM users WHERE username = :u"), {"u": username}).fetchone()
+        if result:
+            stored_password, role = result
+            if stored_password == make_hashes(password):
+                return role
     return None
 
 def save_to_db(record, username):
-    conn = sqlite3.connect("logistics_audits.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO audits (filename, tracking_id, container_no, port, date, status, username)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (record["Filename"], record["Tracking ID"], record["Container No"], record["Port of Discharge"], record["Date"], record["Audit Status"], username))
-    conn.commit()
-    conn.close()
+    with engine.begin() as conn:
+        conn.execute(sqlalchemy.text("""
+            INSERT INTO audits (filename, tracking_id, container_no, port, date, status, username)
+            VALUES (:f, :t, :c, :p, :d, :s, :u)
+        """), {
+            "f": record["Filename"],
+            "t": record["Tracking ID"],
+            "c": record["Container No"],
+            "p": record["Port of Discharge"],
+            "d": record["Date"],
+            "s": record["Audit Status"],
+            "u": username
+        })
 
 # Streamlit page configuration
 st.set_page_config(
@@ -109,7 +132,7 @@ if "logged_in" not in st.session_state:
     st.session_state["role"] = ""
 
 if not st.session_state["logged_in"]:
-    st.title("🔐 Logistics SaaS - Secure Login")
+    st.title("🔐 Logistics SaaS - Secure Enterprise Login")
     tab1, tab2 = st.tabs(["Login", "Register New Account"])
     
     with tab1:
@@ -143,7 +166,7 @@ if not st.session_state["logged_in"]:
                 st.warning("Please fill in all fields.")
     st.stop()
 
-# --- Main App (Accessible only when logged in) ---
+# --- Main App ---
 st.sidebar.write(f"👤 Logged in as: **{st.session_state['username']}** ({st.session_state['role']})")
 if st.sidebar.button("Log out"):
     st.session_state["logged_in"] = False
@@ -153,15 +176,13 @@ if st.sidebar.button("Log out"):
 
 st.title("📦 Logistics Invoice Auditor & Database Engine")
 st.write(
-    "Upload multiple logistics invoices for automated batch processing, contract auditing, and secure database logging."
+    "Upload multiple logistics invoices for automated batch processing, contract auditing, and secure enterprise database logging."
 )
 
-# Sidebar for Contract Rules & Benchmarks
 st.sidebar.header("📋 Contract Benchmark Rules")
 max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight ($)", value=3000.0)
 max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value=700.0)
 
-# Navigation
 st.sidebar.markdown("---")
 app_mode = st.sidebar.radio(
     "Navigation", 
@@ -252,7 +273,7 @@ if app_mode == "Process & Audit Invoices":
                 batch_results.append(parsed_data)
                 
         if batch_results:
-            st.success("Batch Processing, Auditing & Secure Database Logging Complete!")
+            st.success("Batch Processing, Auditing & Cloud Database Logging Complete!")
             st.subheader("📊 Consolidated Batch Audit Report")
             df_batch = pd.DataFrame(batch_results)
             st.dataframe(df_batch, use_container_width=True)
@@ -266,18 +287,15 @@ if app_mode == "Process & Audit Invoices":
             )
 
 elif app_mode == "View Audit Database History":
-    st.subheader("🗄️ Historical Audit Database Logs")
-    conn = sqlite3.connect("logistics_audits.db")
+    st.subheader("🗄️ Enterprise Cloud Database Logs")
     
-    # Admins can see all logs, regular users see only their own logs
     if st.session_state["role"] == "Admin":
-        df_history = pd.read_sql_query("SELECT * FROM audits ORDER BY timestamp DESC", conn)
-        st.info("Showing all system audits (Admin View)")
+        df_history = pd.read_sql("SELECT * FROM audits ORDER BY timestamp DESC", engine)
+        st.info("Showing all system audits (Admin Enterprise View)")
     else:
-        df_history = pd.read_sql_query("SELECT * FROM audits WHERE username = ? ORDER BY timestamp DESC", conn, params=(st.session_state["username"],))
+        query = sqlalchemy.text("SELECT * FROM audits WHERE username = :u ORDER BY timestamp DESC")
+        df_history = pd.read_sql(query, engine, params={"u": st.session_state["username"]})
         st.info(f"Showing audits for user: {st.session_state['username']}")
-        
-    conn.close()
     
     if not df_history.empty:
         st.dataframe(df_history, use_container_width=True)
@@ -293,15 +311,13 @@ elif app_mode == "View Audit Database History":
 
 elif app_mode == "Analytics & KPI Dashboard":
     st.subheader("📈 Executive Logistics Analytics & KPIs")
-    conn = sqlite3.connect("logistics_audits.db")
     
     if st.session_state["role"] == "Admin":
-        df_analytics = pd.read_sql_query("SELECT * FROM audits", conn)
+        df_analytics = pd.read_sql("SELECT * FROM audits", engine)
     else:
-        df_analytics = pd.read_sql_query("SELECT * FROM audits WHERE username = ?", conn, params=(st.session_state["username"],))
+        query = sqlalchemy.text("SELECT * FROM audits WHERE username = :u")
+        df_analytics = pd.read_sql(query, engine, params={"u": st.session_state["username"]})
         
-    conn.close()
-    
     if not df_analytics.empty:
         total_audits = len(df_analytics)
         approved_count = len(df_analytics[df_analytics["status"] == "✅ Approved"])
