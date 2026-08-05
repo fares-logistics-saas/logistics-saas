@@ -9,6 +9,11 @@ from pdf2image import convert_from_path
 import streamlit as st
 import pandas as pd
 import sqlalchemy
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 # Automatic path detection for Windows vs Cloud (Linux)
 if platform.system() == "Windows":
@@ -117,6 +122,61 @@ def save_to_db(record, username):
             "s": record["Audit Status"],
             "u": username
         })
+
+# --- PDF Report Generator Function ---
+def generate_executive_pdf(df, title_text):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'ExecutiveTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#1f2937'),
+        spaceAfter=12,
+        alignment=1
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'ExecutiveSubtitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor('#4b5563'),
+        spaceAfter=20,
+        alignment=1
+    )
+    
+    elements.append(Paragraph("<b>LOGISTICS SAAS - EXECUTIVE AUDIT REPORT</b>", title_style))
+    elements.append(Paragraph(f"{title_text}", subtitle_style))
+    elements.append(Spacer(1, 10))
+    
+    # Convert DataFrame to list format for ReportLab Table
+    table_data = [list(df.columns)]
+    for _, row in df.iterrows():
+        table_data.append([str(val) for val in row.values])
+        
+    t = Table(table_data, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f9fafb')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+    
+    elements.append(t)
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
 
 # Streamlit page configuration
 st.set_page_config(
@@ -289,13 +349,23 @@ if app_mode == "Process & Audit Invoices":
             df_batch = pd.DataFrame(batch_results)
             st.dataframe(df_batch, use_container_width=True)
             
-            csv_data = df_batch.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Consolidated Batch Report (CSV)",
-                data=csv_data,
-                file_name='batch_audit_report.csv',
-                mime='text/csv',
-            )
+            col_csv, col_pdf = st.columns(2)
+            with col_csv:
+                csv_data = df_batch.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Batch Report (CSV)",
+                    data=csv_data,
+                    file_name='batch_audit_report.csv',
+                    mime='text/csv',
+                )
+            with col_pdf:
+                pdf_buffer = generate_executive_pdf(df_batch, f"Batch Processing Report for User: {st.session_state['username']}")
+                st.download_button(
+                    label="📄 Download Executive Report (PDF)",
+                    data=pdf_buffer,
+                    file_name='executive_audit_report.pdf',
+                    mime='application/pdf',
+                )
 
 elif app_mode == "View Audit Database History":
     st.subheader("🗄️ Enterprise Cloud Database Logs")
@@ -310,13 +380,23 @@ elif app_mode == "View Audit Database History":
     
     if not df_history.empty:
         st.dataframe(df_history, use_container_width=True)
-        csv_history = df_history.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download History (CSV)",
-            data=csv_history,
-            file_name='audit_history.csv',
-            mime='text/csv',
-        )
+        col_csv, col_pdf = st.columns(2)
+        with col_csv:
+            csv_history = df_history.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download History (CSV)",
+                data=csv_history,
+                file_name='audit_history.csv',
+                mime='text/csv',
+            )
+        with col_pdf:
+            pdf_buffer = generate_executive_pdf(df_history, "Full Audit Database History Report")
+            st.download_button(
+                label="📄 Download Executive Report (PDF)",
+                data=pdf_buffer,
+                file_name='audit_history_executive.pdf',
+                mime='application/pdf',
+            )
     else:
         st.info("No historical records found.")
 
@@ -363,12 +443,22 @@ elif app_mode == "🚨 Automated Alerts & Notifications":
         st.error(f"⚠️ Total Active Discrepancy Alerts Requiring Attention: {len(df_alerts)}")
         st.dataframe(df_alerts, use_container_width=True)
         
-        csv_alerts = df_alerts.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Discrepancy Alerts Report (CSV)",
-            data=csv_alerts,
-            file_name='discrepancy_alerts.csv',
-            mime='text/csv',
-        )
+        col_csv, col_pdf = st.columns(2)
+        with col_csv:
+            csv_alerts = df_alerts.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Alerts Report (CSV)",
+                data=csv_alerts,
+                file_name='discrepancy_alerts.csv',
+                mime='text/csv',
+            )
+        with col_pdf:
+            pdf_buffer = generate_executive_pdf(df_alerts, "Executive Financial Discrepancies Report")
+            st.download_button(
+                label="📄 Download Executive Report (PDF)",
+                data=pdf_buffer,
+                file_name='discrepancy_alerts_executive.pdf',
+                mime='application/pdf',
+            )
     else:
         st.success("🎉 Outstanding! No discrepancy alerts found. All invoices comply with contract benchmarks.")
