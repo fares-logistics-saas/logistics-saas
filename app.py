@@ -19,7 +19,7 @@ else:
     pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
     POPPLER_PATH = None
 
-# --- NEW: Initialize SQLite Database ---
+# --- Initialize SQLite Database ---
 def init_db():
     conn = sqlite3.connect("logistics_audits.db")
     cursor = conn.cursor()
@@ -65,9 +65,12 @@ st.sidebar.header("📋 Contract Benchmark Rules")
 max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight ($)", value=3000.0)
 max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value=700.0)
 
-# Navigation / Mode selection in Sidebar
+# Navigation / Mode selection in Sidebar (Updated with Analytics Dashboard)
 st.sidebar.markdown("---")
-app_mode = st.sidebar.radio("Navigation", ["Process & Audit Invoices", "View Audit Database History"])
+app_mode = st.sidebar.radio(
+    "Navigation", 
+    ["Process & Audit Invoices", "View Audit Database History", "Analytics & KPI Dashboard"]
+)
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -183,3 +186,26 @@ elif app_mode == "View Audit Database History":
         )
     else:
         st.info("No historical records found in the database yet. Process some invoices first!")
+
+elif app_mode == "Analytics & KPI Dashboard":
+    st.subheader("📈 Executive Logistics Analytics & KPIs")
+    conn = sqlite3.connect("logistics_audits.db")
+    df_analytics = pd.read_sql_query("SELECT * FROM audits", conn)
+    conn.close()
+    
+    if not df_analytics.empty:
+        total_audits = len(df_analytics)
+        approved_count = len(df_analytics[df_analytics["status"] == "✅ Approved"])
+        discrepancy_count = total_audits - approved_count
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Invoices Audited", total_audits)
+        col2.metric("Approved Invoices", approved_count)
+        col3.metric("Discrepancies Flagged", discrepancy_count)
+        
+        st.markdown("---")
+        st.subheader("Audit Status Distribution")
+        status_counts = df_analytics["status"].value_counts()
+        st.bar_chart(status_counts)
+    else:
+        st.info("No data available for analytics yet. Process some invoices to generate KPIs!")
