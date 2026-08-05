@@ -6,3 +6,4 @@ pdf2image
 Pillow
 sqlalchemy
 psycopg2-binary
+reportlab
