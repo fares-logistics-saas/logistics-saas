@@ -3,4 +3,6 @@ pandas
 pypdf
 pytesseract
 pdf2image
-pillow
+Pillow
+sqlalchemy
+psycopg2-binary
