@@ -36,7 +36,7 @@ else:
 
 engine = sqlalchemy.create_engine(DB_URL)
 
-# --- Initialize Database Tables ---
+# --- Initialize Database Tables with Safe Schema Sync ---
 def init_db():
     with engine.begin() as conn:
         if "sqlite" in DB_URL:
@@ -82,6 +82,7 @@ def init_db():
                 )
             """))
         
+        # Ensure admin user exists
         result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
         if not result:
             hashed_pwd = make_hashes("password123")
@@ -152,7 +153,6 @@ def generate_executive_pdf(df, title_text):
     elements.append(Paragraph(f"{title_text}", subtitle_style))
     elements.append(Spacer(1, 10))
     
-    # Convert DataFrame to list format for ReportLab Table
     table_data = [list(df.columns)]
     for _, row in df.iterrows():
         table_data.append([str(val) for val in row.values])
