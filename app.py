@@ -2,6 +2,9 @@ import os
 import re
 import platform
 import hashlib
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from PIL import Image
 import pypdf
 import pytesseract
@@ -90,6 +93,47 @@ def init_db():
                          {"u": "admin", "p": hashed_pwd, "r": "Admin"})
 
 init_db()
+
+# --- Automated SMTP Email Dispatcher ---
+def send_email_alert(recipient_email, filename, audit_status, container_no):
+    if "email" in st.secrets:
+        try:
+            smtp_server = st.secrets["email"]["smtp_server"]
+            smtp_port = int(st.secrets["email"]["smtp_port"])
+            sender_email = st.secrets["email"]["sender_email"]
+            sender_password = st.secrets["email"]["sender_password"]
+
+            msg = MIMEMultipart()
+            msg['From'] = sender_email
+            msg['To'] = recipient_email
+            msg['Subject'] = f"🚨 LOGISTICS ALERT: Financial Discrepancy Detected ({filename})"
+
+            body = f"""
+            Dear Auditor,
+
+            An automated financial audit discrepancy has been flagged by the Logistics Engine:
+
+            • File Name: {filename}
+            • Container No: {container_no}
+            • Audit Status: {audit_status}
+
+            Action Required: Please log into the Enterprise Logistics Portal to review and process this issue.
+
+            Best regards,
+            Logistics SaaS Automated Audit Engine
+            """
+            msg.attach(MIMEText(body, 'plain'))
+
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+            server.quit()
+            return True
+        except Exception as e:
+            print(f"Email Dispatch Failed: {e}")
+            return False
+    return False
 
 def add_user(username, password, role="User"):
     try:
@@ -242,6 +286,10 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight ($)", val
 max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value=700.0)
 
 st.sidebar.markdown("---")
+st.sidebar.header("📧 Email Notifications")
+alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
+
+st.sidebar.markdown("---")
 app_mode = st.sidebar.radio(
     "Navigation", 
     [
@@ -315,6 +363,7 @@ if app_mode == "Process & Audit Invoices":
         st.info(f"Processing {len(uploaded_files)} invoice(s) for user '{st.session_state['username']}'...")
         batch_results = []
         discrepancy_alerts_count = 0
+        emails_sent_count = 0
         
         for uploaded_file in uploaded_files:
             temp_file_path = f"temp_{uploaded_file.name}"
@@ -335,13 +384,26 @@ if app_mode == "Process & Audit Invoices":
                 parsed_data = parse_invoice_data(raw_text, uploaded_file.name)
                 save_to_db(parsed_data, st.session_state["username"])
                 batch_results.append(parsed_data)
+                
                 if parsed_data["Audit Status"] != "✅ Approved":
                     discrepancy_alerts_count += 1
+                    # Dispatch automated email alert if recipient email provided
+                    if alert_email_recipient:
+                        sent = send_email_alert(
+                            recipient_email=alert_email_recipient,
+                            filename=parsed_data["Filename"],
+                            audit_status=parsed_data["Audit Status"],
+                            container_no=parsed_data["Container No"]
+                        )
+                        if sent:
+                            emails_sent_count += 1
                 
         if batch_results:
             st.success("Batch Processing, Auditing & Cloud Database Logging Complete!")
             if discrepancy_alerts_count > 0:
                 st.warning(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies requiring financial review!")
+                if emails_sent_count > 0:
+                    st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched to '{alert_email_recipient}'.")
             else:
                 st.info("✨ All processed invoices passed benchmark rules successfully.")
                 
