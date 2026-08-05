@@ -34,7 +34,6 @@ engine = sqlalchemy.create_engine(DB_URL)
 # --- Initialize Database Tables ---
 def init_db():
     with engine.begin() as conn:
-        # Check dialect to use correct auto-increment syntax
         if "sqlite" in DB_URL:
             conn.execute(sqlalchemy.text("""
                 CREATE TABLE IF NOT EXISTS audits (
@@ -78,7 +77,6 @@ def init_db():
                 )
             """))
         
-        # Create default admin account if not exists
         result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
         if not result:
             hashed_pwd = make_hashes("password123")
@@ -186,7 +184,12 @@ max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value
 st.sidebar.markdown("---")
 app_mode = st.sidebar.radio(
     "Navigation", 
-    ["Process & Audit Invoices", "View Audit Database History", "Analytics & KPI Dashboard"]
+    [
+        "Process & Audit Invoices", 
+        "View Audit Database History", 
+        "Analytics & KPI Dashboard", 
+        "🚨 Automated Alerts & Notifications"
+    ]
 )
 
 def extract_text_from_pdf(pdf_path):
@@ -251,6 +254,7 @@ if app_mode == "Process & Audit Invoices":
     if uploaded_files:
         st.info(f"Processing {len(uploaded_files)} invoice(s) for user '{st.session_state['username']}'...")
         batch_results = []
+        discrepancy_alerts_count = 0
         
         for uploaded_file in uploaded_files:
             temp_file_path = f"temp_{uploaded_file.name}"
@@ -271,9 +275,16 @@ if app_mode == "Process & Audit Invoices":
                 parsed_data = parse_invoice_data(raw_text, uploaded_file.name)
                 save_to_db(parsed_data, st.session_state["username"])
                 batch_results.append(parsed_data)
+                if parsed_data["Audit Status"] != "✅ Approved":
+                    discrepancy_alerts_count += 1
                 
         if batch_results:
             st.success("Batch Processing, Auditing & Cloud Database Logging Complete!")
+            if discrepancy_alerts_count > 0:
+                st.warning(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies requiring financial review!")
+            else:
+                st.info("✨ All processed invoices passed benchmark rules successfully.")
+                
             st.subheader("📊 Consolidated Batch Audit Report")
             df_batch = pd.DataFrame(batch_results)
             st.dataframe(df_batch, use_container_width=True)
@@ -334,3 +345,30 @@ elif app_mode == "Analytics & KPI Dashboard":
         st.bar_chart(status_counts)
     else:
         st.info("No data available for analytics yet. Process some invoices first!")
+
+elif app_mode == "🚨 Automated Alerts & Notifications":
+    st.subheader("🚨 Automated Discrepancy Alerts Center")
+    st.write("Review all flagged invoices and financial violations detected by the auditing engine.")
+    
+    if st.session_state["role"] == "Admin":
+        query = sqlalchemy.text("SELECT * FROM audits WHERE status != '✅ Approved' ORDER BY timestamp DESC")
+        df_alerts = pd.read_sql(query, engine)
+        st.info("Showing system-wide discrepancy alerts (Admin View)")
+    else:
+        query = sqlalchemy.text("SELECT * FROM audits WHERE username = :u AND status != '✅ Approved' ORDER BY timestamp DESC")
+        df_alerts = pd.read_sql(query, engine, params={"u": st.session_state["username"]})
+        st.info(f"Showing discrepancy alerts for user: {st.session_state['username']}")
+        
+    if not df_alerts.empty:
+        st.error(f"⚠️ Total Active Discrepancy Alerts Requiring Attention: {len(df_alerts)}")
+        st.dataframe(df_alerts, use_container_width=True)
+        
+        csv_alerts = df_alerts.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Discrepancy Alerts Report (CSV)",
+            data=csv_alerts,
+            file_name='discrepancy_alerts.csv',
+            mime='text/csv',
+        )
+    else:
+        st.success("🎉 Outstanding! No discrepancy alerts found. All invoices comply with contract benchmarks.")
