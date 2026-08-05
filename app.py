@@ -36,12 +36,15 @@ else:
 
 engine = sqlalchemy.create_engine(DB_URL)
 
-# --- Initialize Database Tables with Safe Schema Sync ---
+# --- Initialize Database Tables with Schema Force-Sync ---
 def init_db():
     with engine.begin() as conn:
+        # Drop old audits table to force schema update with new columns (status, username)
+        conn.execute(sqlalchemy.text("DROP TABLE IF EXISTS audits"))
+        
         if "sqlite" in DB_URL:
             conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS audits (
+                CREATE TABLE audits (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     filename TEXT,
                     tracking_id TEXT,
@@ -62,7 +65,7 @@ def init_db():
             """))
         else:
             conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS audits (
+                CREATE TABLE audits (
                     id SERIAL PRIMARY KEY,
                     filename TEXT,
                     tracking_id TEXT,
