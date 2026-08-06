@@ -17,6 +17,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
+import openai
 
 # Automatic path detection for Windows vs Cloud (Linux)
 if platform.system() == "Windows":
@@ -286,6 +287,10 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight ($)", val
 max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value=700.0)
 
 st.sidebar.markdown("---")
+st.sidebar.header("🤖 AI Extraction Mode")
+use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=False)
+
+st.sidebar.markdown("---")
 st.sidebar.header("📧 Email Notifications")
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
 
@@ -320,7 +325,8 @@ def extract_text_from_pdf(pdf_path):
             pass
     return text
 
-def parse_invoice_data(text, filename):
+def parse_invoice_with_ai(text, filename):
+    # Fallback default structure
     data = {
         "Filename": filename,
         "Tracking ID": "Not Found",
@@ -330,6 +336,62 @@ def parse_invoice_data(text, filename):
         "Audit Status": "✅ Approved"
     }
     
+    if "openai" in st.secrets and use_ai_engine:
+        try:
+            client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+            prompt = f"""
+            You are an expert logistics auditor. Extract the following fields from the invoice text below:
+            - Tracking ID
+            - Container No
+            - Port of Discharge
+            - Date
+            - Ocean Freight numeric value (if any)
+            - Port Handling/Customs numeric value in JD/JOD (if any)
+
+            Invoice Text:
+            {text[:3000]}
+
+            Return ONLY a valid string format like:
+            Tracking ID: [value]
+            Container No: [value]
+            Port of Discharge: [value]
+            Date: [value]
+            Ocean Freight: [value]
+            Customs Fee: [value]
+            """
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0
+            )
+            ai_output = response.choices[0].message.content
+            
+            # Parse AI response
+            t_match = re.search(r"Tracking ID:\s*(.+)", ai_output, re.IGNORECASE)
+            c_match = re.search(r"Container No:\s*(.+)", ai_output, re.IGNORECASE)
+            p_match = re.search(r"Port of Discharge:\s*(.+)", ai_output, re.IGNORECASE)
+            d_match = re.search(r"Date:\s*(.+)", ai_output, re.IGNORECASE)
+            f_match = re.search(r"Ocean Freight:\s*\$?([\d,]+\.?\d*)", ai_output, re.IGNORECASE)
+            cf_match = re.search(r"Customs Fee:\s*(?:JD)?\s*([\d,]+\.?\d*)", ai_output, re.IGNORECASE)
+            
+            if t_match: data["Tracking ID"] = t_match.group(1).strip()
+            if c_match: data["Container No"] = c_match.group(1).strip()
+            if p_match: data["Port of Discharge"] = p_match.group(1).strip()
+            if d_match: data["Date"] = d_match.group(1).strip()
+            
+            if f_match:
+                val = float(f_match.group(1).replace(",", ""))
+                if val > max_ocean_freight:
+                    data["Audit Status"] = "⚠️ Freight Discrepancy"
+            if cf_match:
+                val = float(cf_match.group(1).replace(",", ""))
+                if val > max_customs_fee:
+                    data["Audit Status"] = "⚠️ Customs Discrepancy"
+            return data
+        except Exception:
+            pass # Fall back to RegEx if AI fails
+            
+    # Default RegEx parser fallback
     track_match = re.search(r"Tracking ID:\s*(.+)", text, re.IGNORECASE)
     cont_match = re.search(r"Container No:\s*(.+)", text, re.IGNORECASE)
     port_match = re.search(r"Port of Discharge:\s*(.+)", text, re.IGNORECASE)
@@ -381,13 +443,12 @@ if app_mode == "Process & Audit Invoices":
                     pass
             
             if raw_text.strip():
-                parsed_data = parse_invoice_data(raw_text, uploaded_file.name)
+                parsed_data = parse_invoice_with_ai(raw_text, uploaded_file.name)
                 save_to_db(parsed_data, st.session_state["username"])
                 batch_results.append(parsed_data)
                 
                 if parsed_data["Audit Status"] != "✅ Approved":
                     discrepancy_alerts_count += 1
-                    # Dispatch automated email alert if recipient email provided
                     if alert_email_recipient:
                         sent = send_email_alert(
                             recipient_email=alert_email_recipient,
@@ -495,7 +556,7 @@ elif app_mode == "🚨 Automated Alerts & Notifications":
     if st.session_state["role"] == "Admin":
         query = sqlalchemy.text("SELECT * FROM audits WHERE status != '✅ Approved' ORDER BY timestamp DESC")
         df_alerts = pd.read_sql(query, engine)
-        st.info("Showing system-wide discrepancy alerts (Admin View)")
+        st.info("Showing system-wide discrepancy alerts (AdminView)")
     else:
         query = sqlalchemy.text("SELECT * FROM audits WHERE username = :u AND status != '✅ Approved' ORDER BY timestamp DESC")
         df_alerts = pd.read_sql(query, engine, params={"u": st.session_state["username"]})
