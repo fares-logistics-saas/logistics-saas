@@ -389,10 +389,10 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق: القضاء على كل لون أحمر، توحيد التصميم كزر Log out، وتثبيت زر التراجع للأبد ---
+# --- تصميم الثيم الساحق: القضاء على كل لون أحمر، تصميم زجاجي موحد، وتثبيت زر التراجع للأبد ---
 st.markdown("""
     <style>
-    /* 1. التخلص من الألوان الحمراء الافتراضية وفرض الأزرق */
+    /* 1. التخلص من الألوان الحمراء الافتراضية وفرض الأزرق (Global Settings) */
     :root {
         --primary-color: #2563eb !important;
         --background-color: #030712 !important;
@@ -411,61 +411,71 @@ st.markdown("""
         color: #f8fafc !important;
     }
 
-    /* 2. تحويل جميع العناصر (حقول إدخال، أزرار راديو، قوائم) لتكون بتصميم متوهج مثل زر Log out تماماً */
-    .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button, div.stButton > button,
-    div[data-baseweb="base-input"], div[data-baseweb="select"] > div, .stNumberInput button {
+    /* 2. تحويل جميع الأزرار لتصميم زجاجي (Wii U Glassy Design) مثل زر Log out */
+    .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button, div.stButton > button, .stNumberInput button {
         border-radius: 12px !important;
         font-weight: 700 !important;
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%) !important;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%) !important;
         backdrop-filter: blur(10px) !important;
         color: white !important;
         border: 1px solid rgba(147, 197, 253, 0.5) !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 0 20px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-        padding: 4px !important;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
     }
-    /* تأثير التحويم والتركيز للجميع */
-    .stButton>button:hover, button:hover, div[data-baseweb="base-input"]:focus-within, div[data-baseweb="select"]:focus-within {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%) !important;
-        box-shadow: 0 0 30px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    .stButton>button:hover, button:hover {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
         border-color: #93c5fd !important;
-    }
-    
-    /* جعل النصوص داخل الحقول بيضاء وشفافة لتندمج مع التدرج الأزرق */
-    input, select, textarea, div[data-baseweb="select"] span {
-        background-color: transparent !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        border: none !important;
-    }
-    /* إخفاء إطارات Streamlit الافتراضية القبيحة */
-    .stSelectbox > div, .stNumberInput > div, .stTextInput > div {
-        border: none !important;
-        box-shadow: none !important;
-        background: transparent !important;
+        transform: translateY(-1px) !important;
     }
 
-    /* 3. إبادة لون الراديو الأحمر (Radio Buttons) واستبداله بأزرق Wii U المضيء */
-    div[role="radiogroup"] div[role="radio"] div {
-        border-color: #93c5fd !important; /* إطار أزرق فاتح للحالة العادية */
+    /* 3. القضاء التام على الإطار الأحمر عند التحديد في حقول الاختيار والنصوص (Selectbox & Text Inputs) */
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stTextInput div[data-baseweb="base-input"],
+    .stNumberInput div[data-baseweb="base-input"],
+    .stPassword div[data-baseweb="base-input"] {
+        border-radius: 12px !important;
+        background-color: rgba(15, 23, 42, 0.7) !important;
+        border: 1px solid rgba(147, 197, 253, 0.3) !important;
+        color: white !important;
     }
-    div[role="radiogroup"] div[role="radio"][aria-checked="true"] > div:first-child {
-        background-color: #2563eb !important; /* الدائرة الزرقاء المضيئة عند الاختيار */
-        border-color: #ffffff !important;
-        box-shadow: 0 0 10px rgba(96, 165, 250, 0.8) !important;
+    .stSelectbox div[data-baseweb="select"] > div:hover,
+    .stSelectbox div[data-baseweb="select"] > div:focus,
+    .stSelectbox div[data-baseweb="select"] > div:focus-within,
+    .stTextInput div[data-baseweb="base-input"]:hover,
+    .stTextInput div[data-baseweb="base-input"]:focus-within,
+    .stNumberInput div[data-baseweb="base-input"]:hover,
+    .stNumberInput div[data-baseweb="base-input"]:focus-within {
+        border-color: #60a5fa !important;
+        box-shadow: 0 0 20px rgba(96, 165, 250, 0.6) !important;
+        outline: none !important;
+        background-color: rgba(15, 23, 42, 0.9) !important;
     }
-    div[role="radiogroup"] div[role="radio"][aria-checked="true"] > div:first-child > div {
+
+    /* 4. إبادة اللون الأحمر من دوائر الاختيار (Radio Buttons) وتطبيق الأزرق الزجاجي (Wii U) */
+    .stRadio [role="radiogroup"] [role="radio"] div:first-of-type,
+    div[data-baseweb="radio"] > div {
+        border-color: #60a5fa !important;
+        background-color: rgba(15, 23, 42, 0.5) !important;
+    }
+    .stRadio [role="radiogroup"] [role="radio"][aria-checked="true"] div:first-of-type,
+    div[data-baseweb="radio"] input:checked + div {
+        background-color: #2563eb !important; /* فرض الأزرق الزجاجي */
+        border-color: #93c5fd !important;
+        box-shadow: 0 0 15px rgba(37, 99, 235, 0.9) !important;
+    }
+    .stRadio [role="radiogroup"] [role="radio"][aria-checked="true"] div:first-of-type > div,
+    div[data-baseweb="radio"] input:checked + div > div {
         background-color: #ffffff !important; /* النقطة الداخلية البيضاء */
     }
 
-    /* 4. تثبيت زر التراجع/القائمة الجانبية بشكل دائم (Sticky/Always Visible) */
+    /* 5. تثبيت زر التراجع/القائمة الجانبية (Back Arrow) بشكل دائم مهما حركت الماوس */
     header[data-testid="stHeader"] {
         opacity: 1 !important;
         visibility: visible !important;
         background: transparent !important;
         z-index: 99999 !important;
     }
-    /* فرض ظهور زر الطي وإلغاء خاصية الإخفاء عند إبعاد الماوس */
     [data-testid="collapsedControl"], button[kind="header"] {
         opacity: 1 !important;
         visibility: visible !important;
@@ -486,7 +496,7 @@ st.markdown("""
         stroke: white !important;
     }
 
-    /* 5. القائمة الجانبية بنمط الزجاج المصنفر الداكن */
+    /* 6. القائمة الجانبية بنمط الزجاج المصنفر الداكن */
     section[data-testid="stSidebar"] {
         background-color: rgba(10, 15, 30, 0.9) !important;
         backdrop-filter: blur(20px);
@@ -495,7 +505,14 @@ st.markdown("""
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
     
-    /* قوائم الاختيار المنسدلة الداكنة المنبثقة */
+    /* جعل النصوص قابلة للقراءة داخل الحقول الزجاجية */
+    input, select, textarea, div[data-baseweb="select"] span {
+        background-color: transparent !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    
+    /* قوائم الاختيار المنسدلة (Dropdown Menu) */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #0f172a !important;
         border: 1px solid rgba(96, 165, 250, 0.4) !important;
