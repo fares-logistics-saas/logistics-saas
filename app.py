@@ -374,7 +374,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الداكن الفاخر والقضاء التام على أي لون أحمر واستبداله بـ Wii U Blue النيون ---
+# --- تصميم الثيم الداكن الفاخر وتثبيت زر الطي وتوحيد كل الأزرار بتصميم Wii U الأزرق المتوهج ---
 st.markdown("""
     <style>
     :root {
@@ -402,6 +402,14 @@ st.markdown("""
         border-right: 1px solid rgba(59, 130, 246, 0.25);
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
+    /* تثبيت زر طي القائمة الجانبية (Collapse Arrow) ليظل ظاهراً دائماً دون أن يختفي عند تحريك الماوس */
+    button[kind="header"], [data-testid="collapsedControl"], button[aria-label="Close sidebar"], button[aria-label="Open sidebar"] {
+        opacity: 1 !important;
+        visibility: visible !important;
+        background-color: rgba(37, 99, 235, 0.8) !important;
+        border-radius: 50% !important;
+        color: white !important;
+    }
     /* كروت المقاييس وبطاقات الرفع */
     div[data-testid="stMetric"], div[data-testid="stFileUploader"] {
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
@@ -416,23 +424,29 @@ st.markdown("""
         color: #60a5fa !important;
         text-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
     }
-    /* استبدال كافة الأزرار بتدرج Wii U الأزرق ومنع أي أحمر نهائياً */
-    .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button {
-        border-radius: 14px !important;
+    /* توحيد تصميم وتدرج جميع الأزرار (بما فيها أزرار + و - والـ Log out) لتكون بنمط Wii U الأزرق الفاخر دون أي قص أو خلفيات رمادية أو حمراء */
+    .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button, div.stButton > button {
+        border-radius: 12px !important;
         font-weight: 700 !important;
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%) !important;
         backdrop-filter: blur(10px);
         color: white !important;
         border: 1px solid rgba(147, 197, 253, 0.5) !important;
-        padding: 0.65rem 1.3rem !important;
+        padding: 0.4rem 0.8rem !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 0 25px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+        box-shadow: 0 0 20px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
     }
     .stButton>button:hover, button:hover, [data-testid="baseButton-primary"]:hover {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%) !important;
-        box-shadow: 0 0 35px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
-        transform: translateY(-2px);
+        box-shadow: 0 0 30px rgba(59, 130, 246, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+        transform: translateY(-1px);
         border-color: #93c5fd !important;
+    }
+    /* منع ظهور أي مربعات مقصوصة أو خلفيات حمراء/رمادية عند الضغط على أزرار الأرقام أو النقصان والزيادة (+ / -) */
+    div.stNumberInput button, button[data-baseweb="button"], .stNumberInput div div {
+        background-color: #1e3a8a !important;
+        border-color: rgba(96, 165, 250, 0.4) !important;
+        color: white !important;
     }
     /* القضاء التام على الإطار الأحمر عند النقر والتركيز في الحقول واستبداله بتوهج أزرق نيون Wii U */
     input:focus, textarea:focus, select:focus, 
