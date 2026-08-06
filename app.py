@@ -315,16 +315,25 @@ LANGUAGES = {
         "reg_sub": "Create a new corporate account",
         "main_title": "📦 Logistics Invoice Auditor & Database Engine",
         "main_desc": "Upload multiple logistics invoices for automated high-speed batch processing, strict contract auditing, and secure enterprise database logging.",
+        
+        "cat_ops": "📥 Core Operations / العمليات الأساسية",
+        "cat_fin": "💼 Finance & Management / المالية والإدارة",
+        "cat_rep": "📊 Analytics & Reports / التقارير والتحليلات",
+        "cat_sys": "⚙️ System & Integration / النظام والربط",
+
         "nav_process": "Process & Audit Invoices",
-        "nav_review": "Manual Review Queue (Human-in-the-Loop)",
+        "nav_review": "Manual Review Queue",
+        "nav_iot": "IoT GPS Container Tracking",
+        
         "nav_dispute": "Automated Dispute Letter Generator",
         "nav_vendor_portal": "Vendor Self-Service Portal",
-        "nav_iot": "IoT GPS Container Demurrage Tracker",
-        "nav_workflow": "Multi-Tier CFO Approval Workflow",
-        "nav_voice": "AI Voice & Text Audit Assistant",
-        "nav_history": "View Audit Database History & Immutable Trails",
+        "nav_workflow": "Multi-Tier CFO Approval",
+        
+        "nav_history": "Audit Database History",
         "nav_kpi": "Analytics, KPIs & AI Forecasting",
         "nav_alerts": "Automated Alerts & Notifications",
+        
+        "nav_voice": "AI Voice & Text Assistant",
         "nav_vendor": "Vendor Risk Assessment",
         "nav_erp": "ERP & Webhook Integration",
     },
@@ -334,16 +343,25 @@ LANGUAGES = {
         "reg_sub": "إنشاء حساب مؤسسي جديد",
         "main_title": "📦 محرك تدقيق فواتير الشحن وقاعدة البيانات",
         "main_desc": "قم برفع فواتير الشحن المتعددة للمعالجة الآلية السريعة، التدقيق الصارم، وحفظ السجلات في قاعدة البيانات السحابية.",
+        
+        "cat_ops": "📥 العمليات الأساسية",
+        "cat_fin": "💼 الإدارة المالية والنزاعات",
+        "cat_rep": "📊 التحليلات والتقارير",
+        "cat_sys": "⚙️ النظام والربط الذكي",
+
         "nav_process": "معالجة وتدقيق الفواتير",
-        "nav_review": "قائمة المراجعة البشرية (Human-in-the-Loop)",
-        "nav_dispute": "منشئ خطابات النزاع القانوني الآلي",
+        "nav_review": "قائمة المراجعة البشرية",
+        "nav_iot": "تتبع الحاويات الجغرافي (IoT)",
+        
+        "nav_dispute": "منشئ خطابات النزاع القانوني",
         "nav_vendor_portal": "بوابة الخدمة الذاتية للموردين",
-        "nav_iot": "متابع حاويات IoT والتتبع الجغرافي",
-        "nav_workflow": "سير الموافقات المالية متعددة المستويات (CFO)",
-        "nav_voice": "المساعد الصوتي والتحليلي الذكي (AI Voice)",
-        "nav_history": "سجلات قاعدة البيانات التدقيقية المشفرة",
-        "nav_kpi": "لوحة التحليلات والتنبؤ المالي بالذكاء الاصطناعي",
+        "nav_workflow": "سير موافقات المدير المالي (CFO)",
+        
+        "nav_history": "سجلات قاعدة البيانات التدقيقية",
+        "nav_kpi": "لوحة التحليلات والتنبؤ المالي (KPIs)",
         "nav_alerts": "مركز التنبيهات الآلية",
+        
+        "nav_voice": "المساعد الصوتي والتحليلي الذكي",
         "nav_vendor": "تقييم مخاطر الموردين",
         "nav_erp": "ربط أنظمة الـ ERP والـ Webhooks",
     }
@@ -353,29 +371,38 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
+# --- تصميم لمسات الدوبامين البصرية الحيوية (Vibrant Neon Glow & Sleek UX) ---
 st.markdown("""
     <style>
     .stApp {
-        background-color: #0b0f19;
+        background-color: #070913;
         color: #f8fafc;
     }
     h1, h2, h3, h4, h5, h6, p, span, label {
         color: #f8fafc !important;
     }
+    /* أزرار بحيوية وتأثير نيون دوبامين جذاب */
     .stButton>button {
-        border-radius: 8px;
-        font-weight: 600;
-        background-color: #3b82f6;
+        border-radius: 12px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        transition: all 0.3s ease;
+        border: 1px solid rgba(59, 130, 246, 0.5);
+        padding: 0.6rem 1.2rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         width: 100%;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.25);
     }
     .stButton>button:hover {
-        background-color: #2563eb;
-        color: white;
-        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5);
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
+        transform: translateY(-2px);
+        border-color: #60a5fa;
+    }
+    /* تنسيق كروت الإحصائيات لتبدو مضيئة وحيوية */
+    div[data-testid="stMetricValue"] {
+        color: #38bdf8 !important;
+        text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -449,6 +476,30 @@ if st.sidebar.button("Log out"):
 st.title(lang["main_title"])
 st.write(lang["main_desc"])
 
+st.sidebar.markdown("---")
+st.sidebar.header("📂 Navigation Categories")
+
+category_choice = st.sidebar.selectbox(
+    "Select Category",
+    [
+        lang["cat_ops"],
+        lang["cat_fin"],
+        lang["cat_rep"],
+        lang["cat_sys"]
+    ],
+    label_visibility="collapsed"
+)
+
+if category_choice == lang["cat_ops"]:
+    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]])
+elif category_choice == lang["cat_fin"]:
+    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_dispute"], lang["nav_vendor_portal"], lang["nav_workflow"]])
+elif category_choice == lang["cat_rep"]:
+    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"]])
+else:
+    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], lang["nav_vendor"], lang["nav_erp"]])
+
+st.sidebar.markdown("---")
 st.sidebar.header("🌍 Multi-Currency & Benchmarks")
 selected_currency = st.sidebar.selectbox("Operating Currency", ["USD ($)", "JOD (JD)", "EUR (€)"])
 max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3000.0)
@@ -461,23 +512,6 @@ use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 st.sidebar.markdown("---")
 st.sidebar.header("📧 Email Notifications")
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
-
-st.sidebar.markdown("---")
-nav_options = [
-    lang["nav_process"], 
-    lang["nav_review"],
-    lang["nav_dispute"],
-    lang["nav_vendor_portal"],
-    lang["nav_iot"],
-    lang["nav_workflow"],
-    lang["nav_voice"],
-    lang["nav_history"], 
-    lang["nav_kpi"], 
-    lang["nav_alerts"],
-    lang["nav_vendor"],
-    lang["nav_erp"]
-]
-app_mode = st.sidebar.radio("Navigation", nav_options)
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -619,7 +653,6 @@ if app_mode == lang["nav_process"]:
                 uploaded_files = [cam_file]
 
         if uploaded_files:
-            # التحديث الجديد: إضافة مؤشرات التحميل الجميلة
             with st.spinner(f"🚀 AI Engine is extracting, validating, and auditing {len(uploaded_files)} invoice(s)..."):
                 batch_results = []
                 discrepancy_alerts_count = 0
@@ -658,10 +691,9 @@ if app_mode == lang["nav_process"]:
                                 if sent:
                                     emails_sent_count += 1
                 
-                time.sleep(0.5) # لمحاكاة سرعة التحليل الواقعية للعين
+                time.sleep(0.5)
                     
             if batch_results:
-                # التحديث الجديد: إشعار منبثق عصري
                 st.toast('Batch Sensor Auditing Complete!', icon='🎯')
                 st.success("✅ Audit Engine processing finished successfully.")
                 
@@ -839,7 +871,6 @@ elif app_mode == lang["nav_kpi"]:
         discrepancy_count = total_audits - approved_count
         estimated_savings = discrepancy_count * 450.0
         
-        # التحديث الجديد: إضافة مؤشرات نمو (Deltas) للوحات الأرقام لتبدو كأنها نظام بنكي حي
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Invoices Audited", total_audits, delta="↑ 12% vs last week")
         col2.metric("Approved Invoices", approved_count, delta="↑ 5% vs last week", delta_color="normal")
