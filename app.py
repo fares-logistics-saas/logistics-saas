@@ -225,18 +225,23 @@ st.set_page_config(
     page_title="Logistics Invoice Auditor", page_icon="📦", layout="wide"
 )
 
-# --- Custom Enterprise SaaS UI Styling ---
+# --- Professional Enterprise SaaS UI Custom Styling ---
 st.markdown("""
     <style>
-    .main {
+    .stApp {
         background-color: #f8fafc;
     }
     .stButton>button {
-        border-radius: 6px;
+        border-radius: 8px;
         font-weight: 600;
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
     }
-    .css-1dp5vir {
-        background-color: #0f172a;
+    .stButton>button:hover {
+        background-color: #1d4ed8;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -252,12 +257,11 @@ if not st.session_state["logged_in"]:
     tab1, tab2 = st.tabs(["Login", "Register New Account"])
     
     with tab1:
-        st.subheader("Login to your account")
-        # Using st.form to solve the login race condition bug completely
+        st.subheader("Login to your corporate account")
         with st.form("login_form"):
             l_user = st.text_input("Username")
             l_pass = st.text_input("Password", type="password")
-            submit_login = st.form_submit_button("Login", type="primary")
+            submit_login = st.form_submit_button("Sign In", type="primary")
             
             if submit_login:
                 if l_user and l_pass:
@@ -279,7 +283,7 @@ if not st.session_state["logged_in"]:
             r_user = st.text_input("Choose Username")
             r_pass = st.text_input("Choose Password", type="password")
             r_role = st.selectbox("Account Role", ["User", "Admin"])
-            submit_reg = st.form_submit_button("Register")
+            submit_reg = st.form_submit_button("Create Account")
             
             if submit_reg:
                 if r_user and r_pass:
@@ -557,7 +561,7 @@ elif app_mode == "Analytics & KPI Dashboard":
         total_audits = len(df_analytics)
         approved_count = len(df_analytics[df_analytics["status"] == "✅ Approved"])
         discrepancy_count = total_audits - approved_count
-        estimated_savings = discrepancy_count * 450.0  # Estimated average cost saving per flagged discrepancy
+        estimated_savings = discrepancy_count * 450.0
         
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Invoices Audited", total_audits)
