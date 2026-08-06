@@ -32,7 +32,7 @@ else:
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Database Engine Configuration (Cloud PostgreSQL or Local SQLite Fallback) ---
+# --- Database Engine Configuration ---
 if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
     DB_URL = st.secrets["postgres"]["url"]
 else:
@@ -86,7 +86,6 @@ def init_db():
                 )
             """))
         
-        # Ensure admin user exists
         result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
         if not result:
             hashed_pwd = make_hashes("password123")
@@ -147,7 +146,7 @@ def add_user(username, password, role="User"):
 
 def login_user(username, password):
     with engine.connect() as conn:
-        result = conn.execute(sqlalchemy.text("SELECT password, role FROM users WHERE username = :u"), {"u": username}).fetchone()
+        result = conn.execute(sqlalchemy.text("SELECT password, role FROM users WHERE username = :u"), {"u": username.strip()}).fetchone()
         if result:
             stored_password, role = result
             if stored_password == make_hashes(password):
@@ -169,7 +168,6 @@ def save_to_db(record, username):
             "u": username
         })
 
-# --- PDF Report Generator Function ---
 def generate_executive_pdf(df, title_text):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -223,7 +221,6 @@ def generate_executive_pdf(df, title_text):
     buffer.seek(0)
     return buffer
 
-# Streamlit page configuration
 st.set_page_config(
     page_title="Logistics Invoice Auditor", page_icon="📦", layout="wide"
 )
@@ -242,16 +239,19 @@ if not st.session_state["logged_in"]:
         st.subheader("Login to your account")
         l_user = st.text_input("Username", key="login_user")
         l_pass = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            role = login_user(l_user, l_pass)
-            if role:
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = l_user
-                st.session_state["role"] = role
-                st.success(f"Welcome back, {l_user}!")
-                st.rerun()
+        if st.button("Login", type="primary"):
+            if l_user and l_pass:
+                role = login_user(l_user, l_pass)
+                if role:
+                    st.session_state["logged_in"] = True
+                    st.session_state["username"] = l_user.strip()
+                    st.session_state["role"] = role
+                    st.success(f"Welcome back, {l_user}!")
+                    st.rerun()
+                else:
+                    st.error("Invalid Username or Password. Please check your credentials.")
             else:
-                st.error("Invalid Username or Password")
+                st.warning("Please enter both username and password.")
                 
     with tab2:
         st.subheader("Create a new corporate account")
@@ -260,7 +260,7 @@ if not st.session_state["logged_in"]:
         r_role = st.selectbox("Account Role", ["User", "Admin"])
         if st.button("Register"):
             if r_user and r_pass:
-                success = add_user(r_user, r_pass, r_role)
+                success = add_user(r_user.strip(), r_pass, r_role)
                 if success:
                     st.success("Account created successfully! Please switch to the Login tab.")
                 else:
@@ -269,7 +269,7 @@ if not st.session_state["logged_in"]:
                 st.warning("Please fill in all fields.")
     st.stop()
 
-# --- Main App ---
+# --- Main App Sidebar Configuration ---
 st.sidebar.write(f"👤 Logged in as: **{st.session_state['username']}** ({st.session_state['role']})")
 if st.sidebar.button("Log out"):
     st.session_state["logged_in"] = False
@@ -288,7 +288,7 @@ max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value
 
 st.sidebar.markdown("---")
 st.sidebar.header("🤖 AI Extraction Mode")
-use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=False)
+use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 
 st.sidebar.markdown("---")
 st.sidebar.header("📧 Email Notifications")
@@ -301,7 +301,8 @@ app_mode = st.sidebar.radio(
         "Process & Audit Invoices", 
         "View Audit Database History", 
         "Analytics & KPI Dashboard", 
-        "🚨 Automated Alerts & Notifications"
+        "🚨 Automated Alerts & Notifications",
+        "🏢 Vendor Risk Assessment"
     ]
 )
 
@@ -326,7 +327,6 @@ def extract_text_from_pdf(pdf_path):
     return text
 
 def parse_invoice_with_ai(text, filename):
-    # Fallback default structure
     data = {
         "Filename": filename,
         "Tracking ID": "Not Found",
@@ -366,7 +366,6 @@ def parse_invoice_with_ai(text, filename):
             )
             ai_output = response.choices[0].message.content
             
-            # Parse AI response
             t_match = re.search(r"Tracking ID:\s*(.+)", ai_output, re.IGNORECASE)
             c_match = re.search(r"Container No:\s*(.+)", ai_output, re.IGNORECASE)
             p_match = re.search(r"Port of Discharge:\s*(.+)", ai_output, re.IGNORECASE)
@@ -389,9 +388,8 @@ def parse_invoice_with_ai(text, filename):
                     data["Audit Status"] = "⚠️ Customs Discrepancy"
             return data
         except Exception:
-            pass # Fall back to RegEx if AI fails
+            pass
             
-    # Default RegEx parser fallback
     track_match = re.search(r"Tracking ID:\s*(.+)", text, re.IGNORECASE)
     cont_match = re.search(r"Container No:\s*(.+)", text, re.IGNORECASE)
     port_match = re.search(r"Port of Discharge:\s*(.+)", text, re.IGNORECASE)
@@ -585,3 +583,19 @@ elif app_mode == "🚨 Automated Alerts & Notifications":
             )
     else:
         st.success("🎉 Outstanding! No discrepancy alerts found. All invoices comply with contract benchmarks.")
+
+elif app_mode == "🏢 Vendor Risk Assessment":
+    st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
+    st.write("Analyze compliance history and auditing performance per user/vendor account.")
+    
+    if st.session_state["role"] == "Admin":
+        df_vendor = pd.read_sql("SELECT username, status, COUNT(*) as count FROM audits GROUP BY username, status", engine)
+    else:
+        query = sqlalchemy.text("SELECT username, status, COUNT(*) as count FROM audits WHERE username = :u GROUP BY username, status")
+        df_vendor = pd.read_sql(query, engine, params={"u": st.session_state["username"]})
+        
+    if not df_vendor.empty:
+        st.dataframe(df_vendor, use_container_width=True)
+        st.info("💡 High discrepancy ratios indicate higher financial risk from specific vendors or operational lines.")
+    else:
+        st.info("No vendor assessment data available yet.")
