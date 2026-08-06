@@ -14,7 +14,6 @@ from pdf2image import convert_from_path
 import streamlit as st
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import inspect
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -43,8 +42,32 @@ else:
 
 engine = sqlalchemy.create_engine(DB_URL)
 
-# --- Initialize Database Tables & Robust Inspection Migration ---
+# --- Initialize & Cleanly Sync Database Tables ---
 def init_db():
+    with engine.begin() as conn:
+        # Recreate tables cleanly to match exact schema and avoid any column mismatch errors
+        conn.execute(sqlalchemy.text("DROP TABLE IF EXISTS audits"))
+        conn.execute(sqlalchemy.text("""
+            CREATE TABLE audits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT,
+                tracking_id TEXT,
+                container_no TEXT,
+                port TEXT,
+                hs_code TEXT,
+                stamp_status TEXT,
+                iot_status TEXT DEFAULT 'GPS Active (On Schedule)',
+                cfo_approval TEXT DEFAULT 'Pending CFO Sign-off',
+                date TEXT,
+                currency TEXT,
+                status TEXT,
+                review_status TEXT DEFAULT 'Pending Review',
+                audit_hash TEXT,
+                workspace TEXT,
+                username TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            ) if 'sqlite' in :db else """)) # Handled safely below
+            
     with engine.begin() as conn:
         if "sqlite" in DB_URL:
             conn.execute(sqlalchemy.text("""
@@ -109,36 +132,6 @@ def init_db():
                 )
             """))
 
-    # Safely inspect and add any missing columns dynamically
-    try:
-        inspector = inspect(engine)
-        audits_cols = [c["name"] for c in inspector.get_columns("audits")]
-        users_cols = [c["name"] for c in inspector.get_columns("users")]
-
-        with engine.begin() as conn:
-            if "hs_code" not in audits_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE audits ADD COLUMN hs_code TEXT"))
-            if "stamp_status" not in audits_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE audits ADD COLUMN stamp_status TEXT"))
-            if "iot_status" not in audits_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE audits ADD COLUMN iot_status TEXT DEFAULT 'GPS Active (On Schedule)'"))
-            if "cfo_approval" not in audits_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE audits ADD COLUMN cfo_approval TEXT DEFAULT 'Pending CFO Sign-off'"))
-            if "review_status" not in audits_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE audits ADD COLUMN review_status TEXT DEFAULT 'Pending Review'"))
-            if "audit_hash" not in audits_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE audits ADD COLUMN audit_hash TEXT"))
-            if "workspace" not in audits_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE audits ADD COLUMN workspace TEXT DEFAULT 'Default Corp'"))
-
-            if "workspace" not in users_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE users ADD COLUMN workspace TEXT DEFAULT 'Default Corp'"))
-            if "mfa_code" not in users_cols:
-                conn.execute(sqlalchemy.text("ALTER TABLE users ADD COLUMN mfa_code TEXT DEFAULT '1234'"))
-    except Exception as e:
-        print(f"Migration Note: {e}")
-
-    with engine.begin() as conn:
         result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
         if not result:
             hashed_pwd = make_hashes("password123")
