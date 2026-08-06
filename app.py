@@ -377,6 +377,12 @@ lang = LANGUAGES[selected_lang]
 # --- تصميم الثيم الداكن الفاخر والقضاء التام على أي لون أحمر واستبداله بـ Wii U Blue النيون ---
 st.markdown("""
     <style>
+    :root {
+        --primary-color: #2563eb !important;
+        --background-color: #030712 !important;
+        --secondary-background-color: #0f172a !important;
+        --text-color: #f8fafc !important;
+    }
     .stApp, body, [data-testid="stViewToolbar"], header {
         background-color: #030712 !important;
         color: #f8fafc !important;
@@ -410,8 +416,8 @@ st.markdown("""
         color: #60a5fa !important;
         text-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
     }
-    /* استبدال كل الأزرار (بما فيها الأساسية primary وزرار الإرسال) بتدرج Wii U الأزرق وتجنب أي لون أحمر نهائياً */
-    .stButton>button, button[kind="primary"], [data-testid="baseButton-primary"] {
+    /* استبدال كافة الأزرار بتدرج Wii U الأزرق ومنع أي أحمر نهائياً */
+    .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button {
         border-radius: 14px !important;
         font-weight: 700 !important;
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%) !important;
@@ -420,19 +426,24 @@ st.markdown("""
         border: 1px solid rgba(147, 197, 253, 0.5) !important;
         padding: 0.65rem 1.3rem !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        width: 100%;
         box-shadow: 0 0 25px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
     }
-    .stButton>button:hover, button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover {
+    .stButton>button:hover, button:hover, [data-testid="baseButton-primary"]:hover {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%) !important;
         box-shadow: 0 0 35px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
         transform: translateY(-2px);
         border-color: #93c5fd !important;
     }
-    /* إلغاء أي إطار أحمر عند النقر أو التركيز واستبداله بتوهج أزرق نيون Wii U */
-    input:focus, textarea:focus, select:focus, div[data-baseweb="input"]:focus-within, [data-baseweb="base-input"]:focus-within {
+    /* القضاء التام على الإطار الأحمر عند النقر والتركيز في الحقول واستبداله بتوهج أزرق نيون Wii U */
+    input:focus, textarea:focus, select:focus, 
+    div[data-baseweb="input"]:focus-within, 
+    [data-baseweb="base-input"]:focus-within,
+    .stTextInput > div > div:focus-within,
+    .stPassword > div > div:focus-within,
+    .stSelectbox > div > div:focus-within,
+    .stNumberInput > div > div:focus-within {
         border-color: #60a5fa !important;
-        box-shadow: 0 0 15px rgba(96, 165, 250, 0.6) !important;
+        box-shadow: 0 0 15px rgba(96, 165, 250, 0.7) !important;
     }
     /* قوائم الاختيار المنسدلة الداكنة */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
