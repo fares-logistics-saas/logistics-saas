@@ -374,7 +374,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الداكن الفاخر وتثبيت زر الطي وتنسيق الحقول لتكون متناسقة تماماً مثل زر Log out بدون مستطيلات خارجية ---
+# --- تصميم الثيم الداكن القائم بالكامل على أزرق Wii U وتثبيت الزر وإلغاء أي لون أحمر نهائياً ---
 st.markdown("""
     <style>
     :root {
@@ -402,7 +402,7 @@ st.markdown("""
         border-right: 1px solid rgba(59, 130, 246, 0.25);
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
-    /* تثبيت زر طي القائمة الجانبية (Collapse Arrow) ليظل ظاهراً دائماً دون أن يختفي عند تحريك الماوس */
+    /* تثبيت زر طي القائمة الجانبية ليظل ظاهراً ومرئياً دائماً */
     button[kind="header"], [data-testid="collapsedControl"], button[aria-label="Close sidebar"], button[aria-label="Open sidebar"] {
         opacity: 1 !important;
         visibility: visible !important;
@@ -424,7 +424,7 @@ st.markdown("""
         color: #60a5fa !important;
         text-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
     }
-    /* توحيد الأزرار وزر Log out وأزرار التحكم بالأسعار لتكون بنمط Wii U الأزرق المتوهج */
+    /* توحيد كل الأزرار وزر Log out وأزرار التحكم لتكون بتصميم Wii U الأزرق المتوهج النظيف */
     .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button, div.stButton > button {
         border-radius: 12px !important;
         font-weight: 700 !important;
@@ -442,7 +442,7 @@ st.markdown("""
         transform: translateY(-1px);
         border-color: #93c5fd !important;
     }
-    /* إلغاء الإطار الخارجي الكبير المزعج حول الحقول، وجعل التوهج يحيط بالحقل الداخلي فقط نظيفاً مثل زر Log out */
+    /* إزالة أي إطارات خارجية أو مربعات غير مرغوبة حول الحقول */
     div[data-baseweb="base-input"], div[data-baseweb="select"] {
         background-color: rgba(15, 23, 42, 0.9) !important;
         border: 1px solid rgba(96, 165, 250, 0.4) !important;
@@ -453,13 +453,25 @@ st.markdown("""
         border-color: #60a5fa !important;
         box-shadow: 0 0 15px rgba(96, 165, 250, 0.6) !important;
     }
-    /* إخفاء الإطار الخارجي العام للحقول الذي كان يسبب قصة المستطيل فوق النص */
     .stSelectbox > div, .stNumberInput > div, .stTextInput > div {
         border: none !important;
         box-shadow: none !important;
         background: transparent !important;
     }
-    /* أزرار زيادة ونقصان الأرقام (+ / -) */
+    /* القضاء التام على أي نقاط أو ألوان حمراء في أزرار الراديو (Radio Buttons) وتحويلها إلى اللون الأزرق النيون */
+    div[data-baseweb="radio"] div {
+        border-color: #60a5fa !important;
+    }
+    div[data-baseweb="radio"] input:checked + div {
+        background-color: #2563eb !important;
+        border-color: #60a5fa !important;
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.8) !important;
+    }
+    span[data-baseweb="tag"], div[role="checkbox"] {
+        background-color: #2563eb !important;
+        border-color: #60a5fa !important;
+    }
+    /* أزرار زيادة ونقصان الأرقام */
     div.stNumberInput button {
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
         border: 1px solid rgba(147, 197, 253, 0.5) !important;
@@ -966,7 +978,7 @@ elif app_mode == lang["nav_kpi"]:
         
         with col_chart1:
             fig_pie = px.pie(df_analytics, names='status', title='Audit Status Breakdown', 
-                             hole=0.4, color_discrete_sequence=['#10b981', '#ef4444', '#f59e0b'])
+                             hole=0.4, color_discrete_sequence=['#10b981', '#2563eb', '#f59e0b'])
             fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="white")
             st.plotly_chart(fig_pie, use_container_width=True)
             
