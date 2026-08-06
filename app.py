@@ -225,11 +225,11 @@ st.set_page_config(
     page_title="Logistics Invoice Auditor", page_icon="📦", layout="wide"
 )
 
-# --- Professional Enterprise SaaS UI Custom Styling ---
+# --- High-Contrast Professional UI Styling (Clean & Crisp) ---
 st.markdown("""
     <style>
     .stApp {
-        background-color: #f8fafc;
+        color: #1e293b;
     }
     .stButton>button {
         border-radius: 8px;
@@ -242,6 +242,7 @@ st.markdown("""
     }
     .stButton>button:hover {
         background-color: #1d4ed8;
+        color: white;
     }
     </style>
 """, unsafe_allow_html=True)
