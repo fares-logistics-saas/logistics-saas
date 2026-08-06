@@ -371,38 +371,64 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم لمسات الدوبامين البصرية الحيوية (Vibrant Neon Glow & Sleek UX) ---
+# --- تصميم Wii U Deep Blue Glossy & Glassmorphism Design System ---
 st.markdown("""
     <style>
     .stApp {
-        background-color: #070913;
+        background-color: #030712;
+        background-image: radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.18) 0%, transparent 45%),
+                          radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
         color: #f8fafc;
     }
     h1, h2, h3, h4, h5, h6, p, span, label {
         color: #f8fafc !important;
     }
-    /* أزرار بحيوية وتأثير نيون دوبامين جذاب */
+    /* القائمة الجانبية بنمط الزجاج المصنفر وتوهج أزرق */
+    section[data-testid="stSidebar"] {
+        background-color: rgba(10, 15, 30, 0.85) !important;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(59, 130, 246, 0.2);
+        box-shadow: 5px 0 30px rgba(37, 99, 235, 0.1);
+    }
+    /* كروت المقاييس بطابع Wii U اللامع والمتوهج */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(96, 165, 250, 0.35);
+        padding: 20px;
+        border-radius: 18px;
+        box-shadow: 0 10px 30px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        transition: all 0.3s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        border-color: rgba(147, 197, 253, 0.8);
+        box-shadow: 0 15px 35px 0 rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        transform: translateY(-3px);
+    }
+    div[data-testid="stMetricValue"] {
+        color: #60a5fa !important;
+        text-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
+    }
+    /* أزرار عصرية متوهجة بلمعان Wii U النيون الأزرق */
     .stButton>button {
-        border-radius: 12px;
+        border-radius: 14px;
         font-weight: 700;
-        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%);
+        backdrop-filter: blur(10px);
         color: white;
-        border: 1px solid rgba(59, 130, 246, 0.5);
-        padding: 0.6rem 1.2rem;
+        border: 1px solid rgba(147, 197, 253, 0.5);
+        padding: 0.65rem 1.3rem;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         width: 100%;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.25);
+        box-shadow: 0 0 25px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     }
     .stButton>button:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+        box-shadow: 0 0 35px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6);
         transform: translateY(-2px);
-        border-color: #60a5fa;
-    }
-    /* تنسيق كروت الإحصائيات لتبدو مضيئة وحيوية */
-    div[data-testid="stMetricValue"] {
-        color: #38bdf8 !important;
-        text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+        border-color: #93c5fd;
     }
     </style>
 """, unsafe_allow_html=True)
