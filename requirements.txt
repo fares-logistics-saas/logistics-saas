@@ -7,3 +7,4 @@ Pillow
 sqlalchemy
 psycopg2-binary
 reportlab
+openai
