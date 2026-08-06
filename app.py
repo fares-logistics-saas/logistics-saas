@@ -52,6 +52,7 @@ def init_db():
                     container_no TEXT,
                     port TEXT,
                     date TEXT,
+                    currency TEXT,
                     status TEXT,
                     username TEXT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -73,6 +74,7 @@ def init_db():
                     container_no TEXT,
                     port TEXT,
                     date TEXT,
+                    currency TEXT,
                     status TEXT,
                     username TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -135,7 +137,7 @@ def send_email_alert(recipient_email, filename, audit_status, container_no):
             return False
     return False
 
-def add_user(username, password, role="User"):
+def add_user(username, password, role="Auditor"):
     try:
         with engine.begin() as conn:
             conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role) VALUES (:u, :p, :r)"),
@@ -156,14 +158,15 @@ def login_user(username, password):
 def save_to_db(record, username):
     with engine.begin() as conn:
         conn.execute(sqlalchemy.text("""
-            INSERT INTO audits (filename, tracking_id, container_no, port, date, status, username)
-            VALUES (:f, :t, :c, :p, :d, :s, :u)
+            INSERT INTO audits (filename, tracking_id, container_no, port, date, currency, status, username)
+            VALUES (:f, :t, :c, :p, :d, :cur, :s, :u)
         """), {
             "f": record["Filename"],
             "t": record["Tracking ID"],
             "c": record["Container No"],
             "p": record["Port of Discharge"],
             "d": record["Date"],
+            "cur": record["Currency"],
             "s": record["Audit Status"],
             "u": username
         })
@@ -287,7 +290,7 @@ if not st.session_state["logged_in"]:
         with st.form("register_form"):
             r_user = st.text_input("Choose Username")
             r_pass = st.text_input("Choose Password", type="password")
-            r_role = st.selectbox("Account Role", ["User", "Admin"])
+            r_role = st.selectbox("Account Role", ["Auditor", "Admin", "Viewer"])
             submit_reg = st.form_submit_button("Create Account")
             
             if submit_reg:
@@ -314,9 +317,10 @@ st.write(
     "Upload multiple logistics invoices for automated high-speed batch processing, strict contract auditing, and secure enterprise database logging."
 )
 
-st.sidebar.header("📋 Contract Benchmark Rules")
-max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight ($)", value=3000.0)
-max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value=700.0)
+st.sidebar.header("🌍 Multi-Currency & Benchmarks")
+selected_currency = st.sidebar.selectbox("Operating Currency", ["USD ($)", "JOD (JD)", "EUR (€)"])
+max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3000.0)
+max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee", value=700.0)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🤖 AI Extraction & Sensor Engine")
@@ -327,16 +331,14 @@ st.sidebar.header("📧 Email Notifications")
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
 
 st.sidebar.markdown("---")
-app_mode = st.sidebar.radio(
-    "Navigation", 
-    [
-        "Process & Audit Invoices", 
-        "View Audit Database History", 
-        "Analytics & KPI Dashboard", 
-        "🚨 Automated Alerts & Notifications",
-        "🏢 Vendor Risk Assessment"
-    ]
-)
+nav_options = [
+    "Process & Audit Invoices", 
+    "View Audit Database History", 
+    "Analytics & KPI Dashboard", 
+    "🚨 Automated Alerts & Notifications",
+    "🏢 Vendor Risk Assessment"
+]
+app_mode = st.sidebar.radio("Navigation", nav_options)
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -358,13 +360,14 @@ def extract_text_from_pdf(pdf_path):
             pass
     return text
 
-def parse_invoice_with_ai(text, filename):
+def parse_invoice_with_ai(text, filename, currency):
     data = {
         "Filename": filename,
         "Tracking ID": "Not Found",
         "Container No": "Not Found",
         "Port of Discharge": "Not Found",
         "Date": "Not Found",
+        "Currency": currency,
         "Audit Status": "✅ Approved"
     }
     
@@ -378,7 +381,7 @@ def parse_invoice_with_ai(text, filename):
             - Port of Discharge
             - Date
             - Ocean Freight numeric value
-            - Port Handling/Customs numeric value in JD/JOD
+            - Port Handling/Customs numeric value
 
             Invoice Text:
             {text[:3000]}
@@ -402,8 +405,8 @@ def parse_invoice_with_ai(text, filename):
             c_match = re.search(r"Container No:\s*(.+)", ai_output, re.IGNORECASE)
             p_match = re.search(r"Port of Discharge:\s*(.+)", ai_output, re.IGNORECASE)
             d_match = re.search(r"Date:\s*(.+)", ai_output, re.IGNORECASE)
-            f_match = re.search(r"Ocean Freight:\s*\$?([\d,]+\.?\d*)", ai_output, re.IGNORECASE)
-            cf_match = re.search(r"Customs Fee:\s*(?:JD)?\s*([\d,]+\.?\d*)", ai_output, re.IGNORECASE)
+            f_match = re.search(r"Ocean Freight:\s*[\$\€\w\s]?([\d,]+\.?\d*)", ai_output, re.IGNORECASE)
+            cf_match = re.search(r"Customs Fee:\s*[\$\€\w\s]?([\d,]+\.?\d*)", ai_output, re.IGNORECASE)
             
             if t_match: data["Tracking ID"] = t_match.group(1).strip()
             if c_match: data["Container No"] = c_match.group(1).strip()
@@ -432,13 +435,13 @@ def parse_invoice_with_ai(text, filename):
     if port_match: data["Port of Discharge"] = port_match.group(1).strip()
     if date_match: data["Date"] = date_match.group(1).strip()
     
-    freight_match = re.search(r"Ocean Freight Charges.*?\$([\d,]+\.?\d*)", text, re.IGNORECASE)
+    freight_match = re.search(r"Ocean Freight Charges.*?([\d,]+\.?\d*)", text, re.IGNORECASE)
     if freight_match:
         val = float(freight_match.group(1).replace(",", ""))
         if val > max_ocean_freight:
             data["Audit Status"] = "⚠️ Freight Discrepancy"
             
-    customs_match = re.search(r"Port Handling.*?JD\s*([\d,]+\.?\d*)", text, re.IGNORECASE)
+    customs_match = re.search(r"Port Handling.*?([\d,]+\.?\d*)", text, re.IGNORECASE)
     if customs_match:
         val = float(customs_match.group(1).replace(",", ""))
         if val > max_customs_fee:
@@ -447,78 +450,81 @@ def parse_invoice_with_ai(text, filename):
     return data
 
 if app_mode == "Process & Audit Invoices":
-    uploaded_files = st.file_uploader(
-        "Choose invoice files (Multiple allowed)", type=["pdf", "png", "jpg", "jpeg"], accept_multiple_files=True
-    )
+    if st.session_state["role"] == "Viewer":
+        st.warning("🔒 Viewer accounts have read-only access and cannot process new invoices.")
+    else:
+        uploaded_files = st.file_uploader(
+            "Choose invoice files (Multiple allowed)", type=["pdf", "png", "jpg", "jpeg"], accept_multiple_files=True
+        )
 
-    if uploaded_files:
-        st.info(f"High-speed processing {len(uploaded_files)} invoice(s) for user '{st.session_state['username']}'...")
-        batch_results = []
-        discrepancy_alerts_count = 0
-        emails_sent_count = 0
-        
-        for uploaded_file in uploaded_files:
-            temp_file_path = f"temp_{uploaded_file.name}"
-            raw_text = ""
+        if uploaded_files:
+            st.info(f"High-speed processing {len(uploaded_files)} invoice(s) under currency '{selected_currency}'...")
+            batch_results = []
+            discrepancy_alerts_count = 0
+            emails_sent_count = 0
             
-            if uploaded_file.type == "application/pdf":
-                with open(temp_file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                raw_text = extract_text_from_pdf(temp_file_path)
-            else:
-                try:
-                    image = Image.open(uploaded_file)
-                    raw_text = pytesseract.image_to_string(image)
-                except Exception:
-                    pass
-            
-            if raw_text.strip():
-                parsed_data = parse_invoice_with_ai(raw_text, uploaded_file.name)
-                save_to_db(parsed_data, st.session_state["username"])
-                batch_results.append(parsed_data)
+            for uploaded_file in uploaded_files:
+                temp_file_path = f"temp_{uploaded_file.name}"
+                raw_text = ""
                 
-                if parsed_data["Audit Status"] != "✅ Approved":
-                    discrepancy_alerts_count += 1
-                    if alert_email_recipient:
-                        sent = send_email_alert(
-                            recipient_email=alert_email_recipient,
-                            filename=parsed_data["Filename"],
-                            audit_status=parsed_data["Audit Status"],
-                            container_no=parsed_data["Container No"]
-                        )
-                        if sent:
-                            emails_sent_count += 1
+                if uploaded_file.type == "application/pdf":
+                    with open(temp_file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    raw_text = extract_text_from_pdf(temp_file_path)
+                else:
+                    try:
+                        image = Image.open(uploaded_file)
+                        raw_text = pytesseract.image_to_string(image)
+                    except Exception:
+                        pass
                 
-        if batch_results:
-            st.success("Batch Sensor Auditing & Cloud Database Logging Complete!")
-            if discrepancy_alerts_count > 0:
-                st.warning(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies requiring financial review!")
-                if emails_sent_count > 0:
-                    st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched to '{alert_email_recipient}'.")
-            else:
-                st.info("✨ All processed invoices passed sensor benchmark rules successfully.")
+                if raw_text.strip():
+                    parsed_data = parse_invoice_with_ai(raw_text, uploaded_file.name, selected_currency)
+                    save_to_db(parsed_data, st.session_state["username"])
+                    batch_results.append(parsed_data)
+                    
+                    if parsed_data["Audit Status"] != "✅ Approved":
+                        discrepancy_alerts_count += 1
+                        if alert_email_recipient:
+                            sent = send_email_alert(
+                                recipient_email=alert_email_recipient,
+                                filename=parsed_data["Filename"],
+                                audit_status=parsed_data["Audit Status"],
+                                container_no=parsed_data["Container No"]
+                            )
+                            if sent:
+                                emails_sent_count += 1
+                    
+            if batch_results:
+                st.success("Batch Sensor Auditing & Cloud Database Logging Complete!")
+                if discrepancy_alerts_count > 0:
+                    st.warning(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies requiring financial review!")
+                    if emails_sent_count > 0:
+                        st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched to '{alert_email_recipient}'.")
+                else:
+                    st.info("✨ All processed invoices passed sensor benchmark rules successfully.")
+                    
+                st.subheader("📊 Consolidated Batch Audit Report")
+                df_batch = pd.DataFrame(batch_results)
+                st.dataframe(df_batch, use_container_width=True)
                 
-            st.subheader("📊 Consolidated Batch Audit Report")
-            df_batch = pd.DataFrame(batch_results)
-            st.dataframe(df_batch, use_container_width=True)
-            
-            col_csv, col_pdf = st.columns(2)
-            with col_csv:
-                csv_data = df_batch.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Download Batch Report (CSV)",
-                    data=csv_data,
-                    file_name='batch_audit_report.csv',
-                    mime='text/csv',
-                )
-            with col_pdf:
-                pdf_buffer = generate_executive_pdf(df_batch, f"Batch Processing Report for User: {st.session_state['username']}")
-                st.download_button(
-                    label="📄 Download Executive Report (PDF)",
-                    data=pdf_buffer,
-                    file_name='executive_audit_report.pdf',
-                    mime='application/pdf',
-                )
+                col_csv, col_pdf = st.columns(2)
+                with col_csv:
+                    csv_data = df_batch.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download Batch Report (CSV)",
+                        data=csv_data,
+                        file_name='batch_audit_report.csv',
+                        mime='text/csv',
+                    )
+                with col_pdf:
+                    pdf_buffer = generate_executive_pdf(df_batch, f"Batch Processing Report for User: {st.session_state['username']}")
+                    st.download_button(
+                        label="📄 Download Executive Report (PDF)",
+                        data=pdf_buffer,
+                        file_name='executive_audit_report.pdf',
+                        mime='application/pdf',
+                    )
 
 elif app_mode == "View Audit Database History":
     st.subheader("🗄️ Enterprise Cloud Database Logs")
@@ -572,7 +578,7 @@ elif app_mode == "Analytics & KPI Dashboard":
         col1.metric("Total Invoices Audited", total_audits)
         col2.metric("Approved Invoices", approved_count)
         col3.metric("Discrepancies Flagged", discrepancy_count)
-        col4.metric("Estimated Cost Savings ($)", f"${estimated_savings:,.2f}")
+        col4.metric("Estimated Cost Savings", f"${estimated_savings:,.2f}")
         
         st.markdown("---")
         st.subheader("Audit Status Distribution")
