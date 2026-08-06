@@ -225,6 +225,22 @@ st.set_page_config(
     page_title="Logistics Invoice Auditor", page_icon="📦", layout="wide"
 )
 
+# --- Custom Enterprise SaaS UI Styling ---
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f8fafc;
+    }
+    .stButton>button {
+        border-radius: 6px;
+        font-weight: 600;
+    }
+    .css-1dp5vir {
+        background-color: #0f172a;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- Authentication State Management ---
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -237,36 +253,43 @@ if not st.session_state["logged_in"]:
     
     with tab1:
         st.subheader("Login to your account")
-        l_user = st.text_input("Username", key="login_user")
-        l_pass = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login", type="primary"):
-            if l_user and l_pass:
-                role = login_user(l_user, l_pass)
-                if role:
-                    st.session_state["logged_in"] = True
-                    st.session_state["username"] = l_user.strip()
-                    st.session_state["role"] = role
-                    st.success(f"Welcome back, {l_user}!")
-                    st.rerun()
+        # Using st.form to solve the login race condition bug completely
+        with st.form("login_form"):
+            l_user = st.text_input("Username")
+            l_pass = st.text_input("Password", type="password")
+            submit_login = st.form_submit_button("Login", type="primary")
+            
+            if submit_login:
+                if l_user and l_pass:
+                    role = login_user(l_user, l_pass)
+                    if role:
+                        st.session_state["logged_in"] = True
+                        st.session_state["username"] = l_user.strip()
+                        st.session_state["role"] = role
+                        st.success(f"Welcome back, {l_user}!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid Username or Password. Please check your credentials.")
                 else:
-                    st.error("Invalid Username or Password. Please check your credentials.")
-            else:
-                st.warning("Please enter both username and password.")
+                    st.warning("Please enter both username and password.")
                 
     with tab2:
         st.subheader("Create a new corporate account")
-        r_user = st.text_input("Choose Username", key="reg_user")
-        r_pass = st.text_input("Choose Password", type="password", key="reg_pass")
-        r_role = st.selectbox("Account Role", ["User", "Admin"])
-        if st.button("Register"):
-            if r_user and r_pass:
-                success = add_user(r_user.strip(), r_pass, r_role)
-                if success:
-                    st.success("Account created successfully! Please switch to the Login tab.")
+        with st.form("register_form"):
+            r_user = st.text_input("Choose Username")
+            r_pass = st.text_input("Choose Password", type="password")
+            r_role = st.selectbox("Account Role", ["User", "Admin"])
+            submit_reg = st.form_submit_button("Register")
+            
+            if submit_reg:
+                if r_user and r_pass:
+                    success = add_user(r_user.strip(), r_pass, r_role)
+                    if success:
+                        st.success("Account created successfully! Please switch to the Login tab.")
+                    else:
+                        st.error("Username already exists. Please choose another.")
                 else:
-                    st.error("Username already exists. Please choose another.")
-            else:
-                st.warning("Please fill in all fields.")
+                    st.warning("Please fill in all fields.")
     st.stop()
 
 # --- Main App Sidebar Configuration ---
@@ -534,11 +557,13 @@ elif app_mode == "Analytics & KPI Dashboard":
         total_audits = len(df_analytics)
         approved_count = len(df_analytics[df_analytics["status"] == "✅ Approved"])
         discrepancy_count = total_audits - approved_count
+        estimated_savings = discrepancy_count * 450.0  # Estimated average cost saving per flagged discrepancy
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Invoices Audited", total_audits)
         col2.metric("Approved Invoices", approved_count)
         col3.metric("Discrepancies Flagged", discrepancy_count)
+        col4.metric("Estimated Cost Savings ($)", f"${estimated_savings:,.2f}")
         
         st.markdown("---")
         st.subheader("Audit Status Distribution")
