@@ -304,8 +304,12 @@ def generate_dispute_letter_pdf(filename, tracking_id, container_no, status):
     buffer.seek(0)
     return buffer
 
+# اجبار الموقع على العمل بالوضع الداكن دائماً وتثبيت ثيم أبل والـ Wii U
 st.set_page_config(
-    page_title="Logistics Invoice Auditor", page_icon="📦", layout="wide"
+    page_title="Logistics Invoice Auditor", 
+    page_icon="📦", 
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 LANGUAGES = {
@@ -371,53 +375,50 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم Wii U Deep Blue Glossy & Glassmorphism Design System ---
+# --- تصميم الثيم الداكن الفاخر (Dark Mode Only + Glassmorphism & Wii U Glow) ---
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #030712;
-        background-image: radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.18) 0%, transparent 45%),
-                          radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
-        color: #f8fafc;
-    }
-    h1, h2, h3, h4, h5, h6, p, span, label {
+    /* فرض الثيم الداكن على كل عناصر الصفحة والويدجتس لمنع أي تداخل أبيض */
+    .stApp, body, [data-testid="stViewToolbar"], header {
+        background-color: #030712 !important;
         color: #f8fafc !important;
     }
-    /* القائمة الجانبية بنمط الزجاج المصنفر وتوهج أزرق */
+    .stApp {
+        background-image: radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.18) 0%, transparent 45%),
+                          radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
+    }
+    h1, h2, h3, h4, h5, h6, p, span, label, div {
+        color: #f8fafc !important;
+    }
+    /* القائمة الجانبية بنمط الزجاج المصنفر الداكن */
     section[data-testid="stSidebar"] {
-        background-color: rgba(10, 15, 30, 0.85) !important;
+        background-color: rgba(10, 15, 30, 0.9) !important;
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border-right: 1px solid rgba(59, 130, 246, 0.2);
-        box-shadow: 5px 0 30px rgba(37, 99, 235, 0.1);
+        border-right: 1px solid rgba(59, 130, 246, 0.25);
+        box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
-    /* كروت المقاييس بطابع Wii U اللامع والمتوهج */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
+    /* كروت المقاييس وبطاقات الرفع بنمط الزجاج والنيون الأزرق */
+    div[data-testid="stMetric"], div[data-testid="stFileUploader"] {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(96, 165, 250, 0.35);
+        border: 1px solid rgba(96, 165, 250, 0.35) !important;
         padding: 20px;
         border-radius: 18px;
-        box-shadow: 0 10px 30px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-        transition: all 0.3s ease;
-    }
-    div[data-testid="stMetric"]:hover {
-        border-color: rgba(147, 197, 253, 0.8);
-        box-shadow: 0 15px 35px 0 rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-        transform: translateY(-3px);
+        box-shadow: 0 10px 30px 0 rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
     div[data-testid="stMetricValue"] {
         color: #60a5fa !important;
         text-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
     }
-    /* أزرار عصرية متوهجة بلمعان Wii U النيون الأزرق */
+    /* أزرار متوهجة بلمعان Wii U النيون الأزرق */
     .stButton>button {
         border-radius: 14px;
         font-weight: 700;
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%);
         backdrop-filter: blur(10px);
-        color: white;
+        color: white !important;
         border: 1px solid rgba(147, 197, 253, 0.5);
         padding: 0.65rem 1.3rem;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -429,6 +430,12 @@ st.markdown("""
         box-shadow: 0 0 35px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6);
         transform: translateY(-2px);
         border-color: #93c5fd;
+    }
+    /* إزالة الخلفيات البيضاء المزعجة في القوائم المنسدلة وحقول الإدخال */
+    input, select, textarea {
+        background-color: rgba(15, 23, 42, 0.8) !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(96, 165, 250, 0.3) !important;
     }
     </style>
 """, unsafe_allow_html=True)
