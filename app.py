@@ -283,7 +283,7 @@ def generate_dispute_letter_pdf(filename, tracking_id, container_no, status):
     elements = []
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('DisputeTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#dc2626'), spaceAfter=15, alignment=1)
+    title_style = ParagraphStyle('DisputeTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#2563eb'), spaceAfter=15, alignment=1)
     body_style = ParagraphStyle('DisputeBody', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#1f2937'), spaceAfter=12, leading=16)
     
     elements.append(Paragraph("<b>FORMAL FINANCIAL DISPUTE NOTICE</b>", title_style))
@@ -374,7 +374,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الداكن الفاخر وتعديل لون التركيز والتفاعل إلى Wii U Blue Glow ---
+# --- تصميم الثيم الداكن الفاخر والقضاء التام على أي لون أحمر واستبداله بـ Wii U Blue النيون ---
 st.markdown("""
     <style>
     .stApp, body, [data-testid="stViewToolbar"], header {
@@ -396,7 +396,7 @@ st.markdown("""
         border-right: 1px solid rgba(59, 130, 246, 0.25);
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
-    /* كروت المقاييس وبطاقات الرفع بنمط الزجاج والنيون الأزرق */
+    /* كروت المقاييس وبطاقات الرفع */
     div[data-testid="stMetric"], div[data-testid="stFileUploader"] {
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
         backdrop-filter: blur(16px);
@@ -410,31 +410,31 @@ st.markdown("""
         color: #60a5fa !important;
         text-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
     }
-    /* أزرار متوهجة بلمعان Wii U النيون الأزرق */
-    .stButton>button {
-        border-radius: 14px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%);
+    /* استبدال كل الأزرار (بما فيها الأساسية primary وزرار الإرسال) بتدرج Wii U الأزرق وتجنب أي لون أحمر نهائياً */
+    .stButton>button, button[kind="primary"], [data-testid="baseButton-primary"] {
+        border-radius: 14px !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%) !important;
         backdrop-filter: blur(10px);
         color: white !important;
-        border: 1px solid rgba(147, 197, 253, 0.5);
-        padding: 0.65rem 1.3rem;
+        border: 1px solid rgba(147, 197, 253, 0.5) !important;
+        padding: 0.65rem 1.3rem !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         width: 100%;
-        box-shadow: 0 0 25px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        box-shadow: 0 0 25px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
     }
-    .stButton>button:hover {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
-        box-shadow: 0 0 35px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    .stButton>button:hover, button[kind="primary"]:hover, [data-testid="baseButton-primary"]:hover {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%) !important;
+        box-shadow: 0 0 35px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
         transform: translateY(-2px);
-        border-color: #93c5fd;
+        border-color: #93c5fd !important;
     }
-    /* استبدال الإطار الأحمر عند النقر والتفاعل بتوهج Wii U الأزرق الساطع */
-    input:focus, textarea:focus, select:focus, div[data-baseweb="input"]:focus-within {
+    /* إلغاء أي إطار أحمر عند النقر أو التركيز واستبداله بتوهج أزرق نيون Wii U */
+    input:focus, textarea:focus, select:focus, div[data-baseweb="input"]:focus-within, [data-baseweb="base-input"]:focus-within {
         border-color: #60a5fa !important;
-        box-shadow: 0 0 15px rgba(96, 165, 250, 0.5) !important;
+        box-shadow: 0 0 15px rgba(96, 165, 250, 0.6) !important;
     }
-    /* تصليح قوائم الاختيار المنسدلة (BaseWeb Dropdown Menus) */
+    /* قوائم الاختيار المنسدلة الداكنة */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #0f172a !important;
         border: 1px solid rgba(96, 165, 250, 0.4) !important;
