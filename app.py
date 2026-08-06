@@ -42,32 +42,9 @@ else:
 
 engine = sqlalchemy.create_engine(DB_URL)
 
-# --- Initialize & Cleanly Sync Database Tables ---
+# --- Initialize Database Tables & Safe Migrations ---
 def init_db():
-    with engine.begin() as conn:
-        # Recreate tables cleanly to match exact schema and avoid any column mismatch errors
-        conn.execute(sqlalchemy.text("DROP TABLE IF EXISTS audits"))
-        conn.execute(sqlalchemy.text("""
-            CREATE TABLE audits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                filename TEXT,
-                tracking_id TEXT,
-                container_no TEXT,
-                port TEXT,
-                hs_code TEXT,
-                stamp_status TEXT,
-                iot_status TEXT DEFAULT 'GPS Active (On Schedule)',
-                cfo_approval TEXT DEFAULT 'Pending CFO Sign-off',
-                date TEXT,
-                currency TEXT,
-                status TEXT,
-                review_status TEXT DEFAULT 'Pending Review',
-                audit_hash TEXT,
-                workspace TEXT,
-                username TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            ) if 'sqlite' in :db else """)) # Handled safely below
-            
+    # 1. Create Tables Safely
     with engine.begin() as conn:
         if "sqlite" in DB_URL:
             conn.execute(sqlalchemy.text("""
@@ -132,6 +109,29 @@ def init_db():
                 )
             """))
 
+    # 2. Add any missing columns to older databases safely
+    migrations = [
+        "ALTER TABLE users ADD COLUMN workspace TEXT DEFAULT 'Default Corp'",
+        "ALTER TABLE users ADD COLUMN mfa_code TEXT DEFAULT '1234'",
+        "ALTER TABLE audits ADD COLUMN hs_code TEXT",
+        "ALTER TABLE audits ADD COLUMN stamp_status TEXT",
+        "ALTER TABLE audits ADD COLUMN iot_status TEXT DEFAULT 'GPS Active (On Schedule)'",
+        "ALTER TABLE audits ADD COLUMN cfo_approval TEXT DEFAULT 'Pending CFO Sign-off'",
+        "ALTER TABLE audits ADD COLUMN review_status TEXT DEFAULT 'Pending Review'",
+        "ALTER TABLE audits ADD COLUMN audit_hash TEXT",
+        "ALTER TABLE audits ADD COLUMN workspace TEXT DEFAULT 'Default Corp'"
+    ]
+    
+    for mig in migrations:
+        try:
+            with engine.begin() as conn:
+                conn.execute(sqlalchemy.text(mig))
+        except Exception:
+            # Column already exists or other safe error
+            pass
+
+    # 3. Create Default Admin
+    with engine.begin() as conn:
         result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
         if not result:
             hashed_pwd = make_hashes("password123")
