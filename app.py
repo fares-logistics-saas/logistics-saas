@@ -36,11 +36,12 @@ else:
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Database Engine Configuration ---
+# --- Database Engine Configuration (Bulletproof Fallback) ---
+DB_URL = "sqlite:///logistics_audits.db"
 if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
-    DB_URL = st.secrets["postgres"]["url"]
-else:
-    DB_URL = "sqlite:///logistics_audits.db"
+    secret_url = st.secrets["postgres"]["url"]
+    if "hostname" not in secret_url and "port" not in secret_url and "username" not in secret_url:
+        DB_URL = secret_url
 
 engine = sqlalchemy.create_engine(DB_URL)
 
@@ -374,7 +375,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الداكن القائم بالكامل على أزرق Wii U وتثبيت الزر وإلغاء أي لون أحمر نهائياً ---
+# --- تصميم الثيم الداكن القائم بالكامل على أزرق Wii U وخلو تام من أي لون أحمر ---
 st.markdown("""
     <style>
     :root {
@@ -458,7 +459,7 @@ st.markdown("""
         box-shadow: none !important;
         background: transparent !important;
     }
-    /* القضاء التام على أي نقاط أو ألوان حمراء في أزرار الراديو (Radio Buttons) وتحويلها إلى اللون الأزرق النيون */
+    /* القضاء التام على أي نقاط أو ألوان حمراء في أزرار الراديو وتحويلها إلى اللون الأزرق النيون */
     div[data-baseweb="radio"] div {
         border-color: #60a5fa !important;
     }
