@@ -374,7 +374,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الداكن الفاخر وتثبيت زر الطي وتوحيد كل الأزرار بتصميم Wii U الأزرق المتوهج ---
+# --- تصميم الثيم الداكن الفاخر وتثبيت زر الطي وتنسيق الحقول لتكون متناسقة تماماً مثل زر Log out بدون مستطيلات خارجية ---
 st.markdown("""
     <style>
     :root {
@@ -424,7 +424,7 @@ st.markdown("""
         color: #60a5fa !important;
         text-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
     }
-    /* توحيد تصميم وتدرج جميع الأزرار (بما فيها أزرار + و - والـ Log out) لتكون بنمط Wii U الأزرق الفاخر دون أي قص أو خلفيات رمادية أو حمراء */
+    /* توحيد الأزرار وزر Log out وأزرار التحكم بالأسعار لتكون بنمط Wii U الأزرق المتوهج */
     .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button, div.stButton > button {
         border-radius: 12px !important;
         font-weight: 700 !important;
@@ -442,22 +442,29 @@ st.markdown("""
         transform: translateY(-1px);
         border-color: #93c5fd !important;
     }
-    /* منع ظهور أي مربعات مقصوصة أو خلفيات حمراء/رمادية عند الضغط على أزرار الأرقام أو النقصان والزيادة (+ / -) */
-    div.stNumberInput button, button[data-baseweb="button"], .stNumberInput div div {
-        background-color: #1e3a8a !important;
-        border-color: rgba(96, 165, 250, 0.4) !important;
-        color: white !important;
+    /* إلغاء الإطار الخارجي الكبير المزعج حول الحقول، وجعل التوهج يحيط بالحقل الداخلي فقط نظيفاً مثل زر Log out */
+    div[data-baseweb="base-input"], div[data-baseweb="select"] {
+        background-color: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(96, 165, 250, 0.4) !important;
+        border-radius: 12px !important;
+        box-shadow: none !important;
     }
-    /* القضاء التام على الإطار الأحمر عند النقر والتركيز في الحقول واستبداله بتوهج أزرق نيون Wii U */
-    input:focus, textarea:focus, select:focus, 
-    div[data-baseweb="input"]:focus-within, 
-    [data-baseweb="base-input"]:focus-within,
-    .stTextInput > div > div:focus-within,
-    .stPassword > div > div:focus-within,
-    .stSelectbox > div > div:focus-within,
-    .stNumberInput > div > div:focus-within {
+    div[data-baseweb="base-input"]:focus-within, div[data-baseweb="select"]:focus-within {
         border-color: #60a5fa !important;
-        box-shadow: 0 0 15px rgba(96, 165, 250, 0.7) !important;
+        box-shadow: 0 0 15px rgba(96, 165, 250, 0.6) !important;
+    }
+    /* إخفاء الإطار الخارجي العام للحقول الذي كان يسبب قصة المستطيل فوق النص */
+    .stSelectbox > div, .stNumberInput > div, .stTextInput > div {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+    }
+    /* أزرار زيادة ونقصان الأرقام (+ / -) */
+    div.stNumberInput button {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        border: 1px solid rgba(147, 197, 253, 0.5) !important;
+        border-radius: 8px !important;
+        color: white !important;
     }
     /* قوائم الاختيار المنسدلة الداكنة */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
@@ -477,7 +484,7 @@ st.markdown("""
     input, select, textarea {
         background-color: rgba(15, 23, 42, 0.8) !important;
         color: #f8fafc !important;
-        border: 1px solid rgba(96, 165, 250, 0.3) !important;
+        border: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
