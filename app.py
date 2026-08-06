@@ -374,7 +374,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الداكن الفاخر وتعديل الخلفيات المنسدلة (Dark Mode + BaseWeb Fix) ---
+# --- تصميم الثيم الداكن الفاخر وتعديل لون التركيز والتفاعل إلى Wii U Blue Glow ---
 st.markdown("""
     <style>
     .stApp, body, [data-testid="stViewToolbar"], header {
@@ -429,7 +429,12 @@ st.markdown("""
         transform: translateY(-2px);
         border-color: #93c5fd;
     }
-    /* تصليح قوائم الاختيار المنسدلة (BaseWeb Dropdown Menus) لتكون داكنة وواضحة تماماً */
+    /* استبدال الإطار الأحمر عند النقر والتفاعل بتوهج Wii U الأزرق الساطع */
+    input:focus, textarea:focus, select:focus, div[data-baseweb="input"]:focus-within {
+        border-color: #60a5fa !important;
+        box-shadow: 0 0 15px rgba(96, 165, 250, 0.5) !important;
+    }
+    /* تصليح قوائم الاختيار المنسدلة (BaseWeb Dropdown Menus) */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #0f172a !important;
         border: 1px solid rgba(96, 165, 250, 0.4) !important;
@@ -469,7 +474,6 @@ if not st.session_state["logged_in"]:
         with st.form("login_form"):
             l_user = st.text_input("Username")
             l_pass = st.text_input("Password", type="password")
-            # تعديل حقل الرمز الثنائي ليكون نصياً عادياً وليس كلمة مرور لمنع إزعاج كروم
             l_mfa = st.text_input("MFA Security Code (Default: 1234)", value="1234")
             submit_login = st.form_submit_button("Sign In Securely", type="primary")
             
