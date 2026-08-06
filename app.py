@@ -304,7 +304,6 @@ def generate_dispute_letter_pdf(filename, tracking_id, container_no, status):
     buffer.seek(0)
     return buffer
 
-# اجبار الموقع على العمل بالوضع الداكن دائماً وتثبيت ثيم أبل والـ Wii U
 st.set_page_config(
     page_title="Logistics Invoice Auditor", 
     page_icon="📦", 
@@ -375,10 +374,9 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الداكن الفاخر (Dark Mode Only + Glassmorphism & Wii U Glow) ---
+# --- تصميم الثيم الداكن الفاخر وتعديل الخلفيات المنسدلة (Dark Mode + BaseWeb Fix) ---
 st.markdown("""
     <style>
-    /* فرض الثيم الداكن على كل عناصر الصفحة والويدجتس لمنع أي تداخل أبيض */
     .stApp, body, [data-testid="stViewToolbar"], header {
         background-color: #030712 !important;
         color: #f8fafc !important;
@@ -431,7 +429,21 @@ st.markdown("""
         transform: translateY(-2px);
         border-color: #93c5fd;
     }
-    /* إزالة الخلفيات البيضاء المزعجة في القوائم المنسدلة وحقول الإدخال */
+    /* تصليح قوائم الاختيار المنسدلة (BaseWeb Dropdown Menus) لتكون داكنة وواضحة تماماً */
+    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
+        background-color: #0f172a !important;
+        border: 1px solid rgba(96, 165, 250, 0.4) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8) !important;
+    }
+    li[data-baseweb="option"] {
+        color: #f8fafc !important;
+        background-color: #0f172a !important;
+    }
+    li[data-baseweb="option"]:hover {
+        background-color: #1e3a8a !important;
+        color: #60a5fa !important;
+    }
     input, select, textarea {
         background-color: rgba(15, 23, 42, 0.8) !important;
         color: #f8fafc !important;
