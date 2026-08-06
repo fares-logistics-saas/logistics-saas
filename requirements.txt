@@ -1,11 +1,12 @@
 streamlit
 pandas
 sqlalchemy
-reportlab
+psycopg2-binary
 openai
+plotly
+reportlab
+Pillow
 pypdf
 pytesseract
 pdf2image
-plotly
 requests
-pillow
