@@ -225,23 +225,27 @@ st.set_page_config(
     page_title="Logistics Invoice Auditor", page_icon="📦", layout="wide"
 )
 
-# --- High-Contrast Professional UI Styling (Clean & Crisp) ---
+# --- Ultra High-Contrast Dark Enterprise Theme Custom Styling ---
 st.markdown("""
     <style>
     .stApp {
-        color: #1e293b;
+        background-color: #0b0f19;
+        color: #f8fafc;
+    }
+    h1, h2, h3, h4, h5, h6, p, span, label {
+        color: #f8fafc !important;
     }
     .stButton>button {
         border-radius: 8px;
         font-weight: 600;
-        background-color: #2563eb;
+        background-color: #3b82f6;
         color: white;
         border: none;
         padding: 0.5rem 1rem;
         transition: all 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #1d4ed8;
+        background-color: #2563eb;
         color: white;
     }
     </style>
@@ -307,7 +311,7 @@ if st.sidebar.button("Log out"):
 
 st.title("📦 Logistics Invoice Auditor & Database Engine")
 st.write(
-    "Upload multiple logistics invoices for automated batch processing, contract auditing, and secure enterprise database logging."
+    "Upload multiple logistics invoices for automated high-speed batch processing, strict contract auditing, and secure enterprise database logging."
 )
 
 st.sidebar.header("📋 Contract Benchmark Rules")
@@ -315,7 +319,7 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight ($)", val
 max_customs_fee = st.sidebar.number_input("Max Allowed Customs Fee (JOD)", value=700.0)
 
 st.sidebar.markdown("---")
-st.sidebar.header("🤖 AI Extraction Mode")
+st.sidebar.header("🤖 AI Extraction & Sensor Engine")
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 
 st.sidebar.markdown("---")
@@ -368,18 +372,18 @@ def parse_invoice_with_ai(text, filename):
         try:
             client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
             prompt = f"""
-            You are an expert logistics auditor. Extract the following fields from the invoice text below:
+            You are an expert high-speed logistics auditing sensor. Extract precisely:
             - Tracking ID
             - Container No
             - Port of Discharge
             - Date
-            - Ocean Freight numeric value (if any)
-            - Port Handling/Customs numeric value in JD/JOD (if any)
+            - Ocean Freight numeric value
+            - Port Handling/Customs numeric value in JD/JOD
 
             Invoice Text:
             {text[:3000]}
 
-            Return ONLY a valid string format like:
+            Return ONLY format:
             Tracking ID: [value]
             Container No: [value]
             Port of Discharge: [value]
@@ -448,7 +452,7 @@ if app_mode == "Process & Audit Invoices":
     )
 
     if uploaded_files:
-        st.info(f"Processing {len(uploaded_files)} invoice(s) for user '{st.session_state['username']}'...")
+        st.info(f"High-speed processing {len(uploaded_files)} invoice(s) for user '{st.session_state['username']}'...")
         batch_results = []
         discrepancy_alerts_count = 0
         emails_sent_count = 0
@@ -486,13 +490,13 @@ if app_mode == "Process & Audit Invoices":
                             emails_sent_count += 1
                 
         if batch_results:
-            st.success("Batch Processing, Auditing & Cloud Database Logging Complete!")
+            st.success("Batch Sensor Auditing & Cloud Database Logging Complete!")
             if discrepancy_alerts_count > 0:
                 st.warning(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies requiring financial review!")
                 if emails_sent_count > 0:
                     st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched to '{alert_email_recipient}'.")
             else:
-                st.info("✨ All processed invoices passed benchmark rules successfully.")
+                st.info("✨ All processed invoices passed sensor benchmark rules successfully.")
                 
             st.subheader("📊 Consolidated Batch Audit Report")
             df_batch = pd.DataFrame(batch_results)
