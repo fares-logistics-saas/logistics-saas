@@ -469,7 +469,8 @@ if not st.session_state["logged_in"]:
         with st.form("login_form"):
             l_user = st.text_input("Username")
             l_pass = st.text_input("Password", type="password")
-            l_mfa = st.text_input("MFA Security Code (Default: 1234)", value="1234", type="password")
+            # تعديل حقل الرمز الثنائي ليكون نصياً عادياً وليس كلمة مرور لمنع إزعاج كروم
+            l_mfa = st.text_input("MFA Security Code (Default: 1234)", value="1234")
             submit_login = st.form_submit_button("Sign In Securely", type="primary")
             
             if submit_login:
