@@ -539,9 +539,9 @@ LANGUAGES = {
     }
 }
 
-# --- إضافة اللوجو الاحترافي في الشريط الجانبي ---
+# --- إضافة اللوجو الاحترافي المحسّن في الشريط الجانبي ---
 logo_svg = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 370 96" width="100%" height="100%">
   <defs>
     <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b82f6" />
@@ -553,9 +553,9 @@ logo_svg = """
     </linearGradient>
   </defs>
 
-  <rect width="400" height="120" rx="16" fill="#030712" />
+  <rect width="370" height="96" rx="12" fill="#030712" />
 
-  <g transform="translate(20, 20)">
+  <g transform="translate(10, 8) scale(1.1)">
     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -564,8 +564,8 @@ logo_svg = """
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
 
-  <text x="115" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan></text>
-  <text x="117" y="80" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#94a3b8" letter-spacing="2.5">SaaS ENTERPRISE ENGINE</text>
+  <text x="110" y="46" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan></text>
+  <text x="112" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#94a3b8" letter-spacing="2.5">SaaS ENTERPRISE ENGINE</text>
 </svg>
 """
 st.sidebar.markdown(logo_svg, unsafe_allow_html=True)
