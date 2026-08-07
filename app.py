@@ -22,6 +22,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import openai
 import plotly.express as px
+import stripe  # 💰 REAL PAYMENT GATEWAY INTEGRATION
 
 # Automatic path detection for Windows vs Cloud (Linux)
 if platform.system() == "Windows":
@@ -166,6 +167,39 @@ PLAN_LIMITS = {
     "Pro": 50,
     "Enterprise": float('inf')
 }
+
+# 💰 --- REAL STRIPE API INTEGRATION --- 💰
+if "stripe" in st.secrets:
+    stripe.api_key = st.secrets["stripe"]["secret_key"]
+
+def create_stripe_checkout(plan_name, price_usd, current_username):
+    # If API keys are set, generate a real payment link
+    if "stripe" in st.secrets:
+        try:
+            # Assuming you are running on Streamlit Cloud, dynamically get the domain or set a default
+            app_url = "https://logistics-saas.streamlit.app"
+            
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': f'Logistics SaaS - {plan_name} Tier',
+                            'description': f'Automated Logistics Auditing - {plan_name} Plan',
+                        },
+                        'unit_amount': int(price_usd * 100), # Stripe uses cents
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=f"{app_url}/?payment_success=true&plan={plan_name}&user={current_username}",
+                cancel_url=f"{app_url}/?payment_cancelled=true",
+            )
+            return session.url
+        except Exception as e:
+            return None
+    return None
 
 # --- Automated SMTP Email Dispatcher ---
 def send_email_alert(recipient_email, filename, audit_status, container_no):
@@ -329,6 +363,18 @@ def generate_dispute_letter_pdf(filename, tracking_id, container_no, status):
 
 st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout="wide", initial_sidebar_state="expanded")
 
+# 💰 CHECK FOR SUCCESSFUL REAL PAYMENT 💰
+query_params = st.query_params
+if "payment_success" in query_params and query_params.get("payment_success") == "true":
+    paid_plan = query_params.get("plan")
+    paid_user = query_params.get("user")
+    if paid_plan and paid_user:
+        upgrade_tier(paid_user, paid_plan)
+        st.success(f"🎉 Payment Successful! Account '{paid_user}' upgraded to {paid_plan} Tier.")
+        st.balloons()
+        # Clear params to prevent looping
+        st.query_params.clear()
+
 LANGUAGES = {
     "English": {
         "login_title": "🔐 Enterprise SSO & MFA Secure Login",
@@ -392,7 +438,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق: إزالة كلمة Form وإلغاء أي لون أحمر للأبد، وتوحيد الأزرار الزجاجية ---
+# --- تصميم الثيم الساحق الزجاجي بالكامل (خالي من العيوب 100%) ---
 st.markdown("""
     <style>
     /* 🔴🔴 إبادة جملة "Press Enter to submit form" نهائياً 🔴🔴 */
@@ -805,7 +851,7 @@ if app_mode == lang["nav_process"]:
                     st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
 
 elif app_mode == lang["nav_billing"]:
-    st.subheader("💎 Enterprise SaaS Billing & Subscriptions")
+    st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Stripe)")
     st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
     
     st.markdown("---")
@@ -847,11 +893,18 @@ elif app_mode == lang["nav_billing"]:
         if user_tier == "Pro":
             st.button("Current Plan", disabled=True, key="btn_pro_cur")
         else:
-            if st.button("💳 Upgrade to Pro", key="btn_pro"):
-                upgrade_tier(st.session_state["username"], "Pro")
-                st.toast("Upgraded to Pro Successfully via Simulated Stripe Checkout!", icon="💸")
-                time.sleep(1)
-                st.rerun()
+            if "stripe" in st.secrets:
+                checkout_url = create_stripe_checkout("Pro", 150, st.session_state["username"])
+                if checkout_url:
+                    st.link_button("💳 Pay Securely with Stripe (Pro)", checkout_url)
+                else:
+                    st.error("Stripe configuration error.")
+            else:
+                if st.button("💳 Upgrade to Pro (Simulation Mode)", key="btn_pro"):
+                    upgrade_tier(st.session_state["username"], "Pro")
+                    st.toast("Upgraded to Pro Successfully via Simulated Checkout!", icon="💸")
+                    time.sleep(1)
+                    st.rerun()
 
     with col3:
         st.markdown("""
@@ -871,11 +924,18 @@ elif app_mode == lang["nav_billing"]:
         if user_tier == "Enterprise":
             st.button("Current Plan", disabled=True, key="btn_ent_cur")
         else:
-            if st.button("💳 Upgrade to Enterprise", key="btn_ent"):
-                upgrade_tier(st.session_state["username"], "Enterprise")
-                st.toast("Upgraded to Enterprise Successfully via Simulated Stripe Checkout!", icon="💸")
-                time.sleep(1)
-                st.rerun()
+            if "stripe" in st.secrets:
+                checkout_url_ent = create_stripe_checkout("Enterprise", 500, st.session_state["username"])
+                if checkout_url_ent:
+                    st.link_button("💳 Pay Securely with Stripe (Enterprise)", checkout_url_ent)
+                else:
+                    st.error("Stripe configuration error.")
+            else:
+                if st.button("💳 Upgrade to Enterprise (Simulation)", key="btn_ent"):
+                    upgrade_tier(st.session_state["username"], "Enterprise")
+                    st.toast("Upgraded to Enterprise Successfully via Simulated Checkout!", icon="💸")
+                    time.sleep(1)
+                    st.rerun()
 
 elif app_mode == lang["nav_review"]:
     st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
