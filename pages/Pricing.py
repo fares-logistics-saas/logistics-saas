@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_title("Pricing - Logistics SaaS")
+st.set_page_config(page_title="Pricing - Logistics SaaS")
 st.title("💰 Pricing Plans")
 
 st.write("Choose the right plan for your logistics business.")
