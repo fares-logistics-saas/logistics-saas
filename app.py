@@ -514,7 +514,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- UI Styling Theme (Fixed Number Input Stepper Separation & Clean Boxes) ---
+# --- UI Styling Theme (Overriding Red Focus Borders to Match Blue Theme) ---
 st.markdown("""
     <style>
     [data-testid="InputInstructions"], 
@@ -593,11 +593,11 @@ st.markdown("""
         transform: scale(1.05) !important;
     }
 
-    /* Clean input fields without unwanted artifacts */
+    /* Clean input fields & overriding red focus borders with blue */
     [data-baseweb="input"], 
     [data-baseweb="base-input"], 
     [data-baseweb="select"] > div {
-        border: none !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
         background-color: rgba(15, 23, 42, 0.7) !important;
         outline: none !important;
@@ -609,7 +609,8 @@ st.markdown("""
     [data-baseweb="input"]:hover, 
     [data-baseweb="base-input"]:hover, 
     [data-baseweb="select"] > div:hover {
-        box-shadow: 0 0 20px rgba(96, 165, 250, 0.6) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.6) !important;
         outline: none !important;
     }
     
