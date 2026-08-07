@@ -392,7 +392,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق: القضاء على كل لون أحمر، تصميم زجاجي موحد، وإصلاح تخطيط الشاشة (بدون تدمير الـ Sidebar) ---
+# --- تصميم الثيم الساحق: توحيد 100% لتصميم الـ Log out لجميع العناصر، وتثبيت زر التراجع للأبد ---
 st.markdown("""
     <style>
     :root {
@@ -401,7 +401,7 @@ st.markdown("""
         --secondary-background-color: #0f172a !important;
         --text-color: #f8fafc !important;
     }
-    .stApp, body, [data-testid="stViewToolbar"], header {
+    .stApp, body, [data-testid="stViewToolbar"] {
         background-color: #030712 !important;
         color: #f8fafc !important;
     }
@@ -412,80 +412,102 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6, p, span, label, div {
         color: #f8fafc !important;
     }
-    .stButton>button, button, [data-testid="baseButton-primary"], [data-testid="stButton"] > button, div.stButton > button, .stNumberInput button {
+    
+    /* 🔴 الجوهر: جعل جميع الأزرار، القوائم المنسدلة، وحقول الإدخال متطابقة 100% مع زر Log out 🔴 */
+    .stButton > button, 
+    button, 
+    [data-testid="baseButton-primary"], 
+    [data-testid="baseButton-secondary"],
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stTextInput div[data-baseweb="base-input"],
+    .stNumberInput div[data-baseweb="base-input"],
+    .stPassword div[data-baseweb="base-input"],
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapseButton"],
+    button[kind="header"] {
         border-radius: 12px !important;
         font-weight: 700 !important;
         background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%) !important;
         backdrop-filter: blur(10px) !important;
         color: white !important;
         border: 1px solid rgba(147, 197, 253, 0.5) !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
-    .stButton>button:hover, button:hover {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-        border-color: #93c5fd !important;
-        transform: translateY(-1px) !important;
-    }
-    .stSelectbox div[data-baseweb="select"] > div,
-    .stTextInput div[data-baseweb="base-input"],
-    .stNumberInput div[data-baseweb="base-input"],
-    .stPassword div[data-baseweb="base-input"] {
-        border-radius: 12px !important;
-        background-color: rgba(15, 23, 42, 0.7) !important;
-        border: 1px solid rgba(147, 197, 253, 0.3) !important;
-        color: white !important;
-    }
+    
+    /* تأثير التحويم (Hover) لجميع العناصر لتكون مضيئة مثل الـ Log out */
+    .stButton > button:hover, 
+    button:hover, 
     .stSelectbox div[data-baseweb="select"] > div:hover,
     .stSelectbox div[data-baseweb="select"] > div:focus-within,
     .stTextInput div[data-baseweb="base-input"]:hover,
     .stTextInput div[data-baseweb="base-input"]:focus-within,
     .stNumberInput div[data-baseweb="base-input"]:hover,
-    .stNumberInput div[data-baseweb="base-input"]:focus-within {
-        border-color: #60a5fa !important;
-        box-shadow: 0 0 20px rgba(96, 165, 250, 0.6) !important;
+    [data-testid="collapsedControl"]:hover,
+    [data-testid="stSidebarCollapseButton"]:hover,
+    button[kind="header"]:hover {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+        border-color: #93c5fd !important;
+        transform: translateY(-1px) !important;
         outline: none !important;
-        background-color: rgba(15, 23, 42, 0.9) !important;
     }
+
+    /* إصلاح لون النص داخل القوائم والحقول ليكون أبيض واضحاً على الخلفية الزرقاء */
+    input, select, textarea, div[data-baseweb="select"] span {
+        background-color: transparent !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+    
+    /* تلوين السهم داخل القائمة المنسدلة باللون الأبيض */
+    div[data-baseweb="select"] svg {
+        fill: white !important;
+        color: white !important;
+    }
+
+    /* 🔴 تثبيت الهيدر وزر القائمة الجانبية للأبد (Fixed and Always Visible) 🔴 */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        z-index: 99999 !important;
+    }
+    
+    /* زر فتح وإغلاق القائمة الجانبية (تم تثبيته في الزاوية اليسرى العليا، مرئي دائماً، وبتصميم Log out) */
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        position: fixed !important;
+        top: 15px !important;
+        left: 15px !important;
+        z-index: 1000000 !important;
+        padding: 6px !important;
+    }
+    [data-testid="collapsedControl"] svg, button[kind="header"] svg, [data-testid="stSidebarCollapseButton"] svg {
+        fill: white !important;
+        color: white !important;
+    }
+
+    /* تصميم دوائر الاختيار (Radio Buttons) لتناسب الثيم الزجاجي الأزرق */
     .stRadio [role="radiogroup"] [role="radio"] div:first-of-type,
     div[data-baseweb="radio"] > div {
         border-color: #60a5fa !important;
-        background-color: rgba(15, 23, 42, 0.5) !important;
+        background-color: rgba(37, 99, 235, 0.3) !important;
     }
     .stRadio [role="radiogroup"] [role="radio"][aria-checked="true"] div:first-of-type,
     div[data-baseweb="radio"] input:checked + div {
-        background-color: #2563eb !important;
-        border-color: #93c5fd !important;
-        box-shadow: 0 0 15px rgba(37, 99, 235, 0.9) !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+        border-color: #ffffff !important;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.9) !important;
     }
     .stRadio [role="radiogroup"] [role="radio"][aria-checked="true"] div:first-of-type > div,
     div[data-baseweb="radio"] input:checked + div > div {
         background-color: #ffffff !important; 
     }
     
-    /* 🔴 إصلاح زر القائمة الجانبية (Sidebar Toggle Fix) 🔴 */
-    /* ألغينا الـ position: fixed الذي دمر الشاشة، واكتفينا بتعديل التصميم والألوان ليبدو كزر زجاجي دون أن يخرب مكان القائمة */
-    [data-testid="collapsedControl"] {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-        border-radius: 50% !important;
-        border: 2px solid rgba(147, 197, 253, 0.8) !important;
-        box-shadow: 0 0 15px rgba(37,99,235,0.8) !important;
-        color: white !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        transition: all 0.3s ease !important;
-        margin-top: 5px !important;
-        margin-left: 5px !important;
-    }
-    [data-testid="collapsedControl"] svg {
-        fill: white !important;
-        color: white !important;
-    }
-    [data-testid="collapsedControl"]:hover {
-        transform: scale(1.1) !important;
-    }
-    
+    /* القائمة الجانبية بنمط الزجاج المصنفر الداكن */
     section[data-testid="stSidebar"] {
         background-color: rgba(10, 15, 30, 0.9) !important;
         backdrop-filter: blur(20px);
@@ -493,11 +515,8 @@ st.markdown("""
         border-right: 1px solid rgba(59, 130, 246, 0.25);
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
-    input, select, textarea, div[data-baseweb="select"] span {
-        background-color: transparent !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
+    
+    /* القوائم المنبثقة للـ Selectbox */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #0f172a !important;
         border: 1px solid rgba(96, 165, 250, 0.4) !important;
@@ -655,7 +674,6 @@ def parse_invoice_with_ai(text, filename, currency):
             c_match = re.search(r"Container No:\s*(.+)", ai_output, re.IGNORECASE)
             if t_match: data["Tracking ID"] = t_match.group(1).strip()
             if c_match: data["Container No"] = c_match.group(1).strip()
-            # (Simplified for processing speed, real system parses full regex as before)
         except Exception:
             pass
             
@@ -674,7 +692,6 @@ def parse_invoice_with_ai(text, filename, currency):
 if app_mode == lang["nav_process"]:
     st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
     
-    # --- SaaS Monetization: Check Limits Before Allowing Upload ---
     limit = PLAN_LIMITS[user_tier]
     remaining = limit - invoices_processed
     
@@ -684,7 +701,6 @@ if app_mode == lang["nav_process"]:
     else:
         st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
         
-        # 🟢 THE RETURN OF THE CAMERA & UPLOAD TOGGLE (Restored!) 🟢
         col1, col2 = st.columns([2, 1])
         with col1:
             input_method = st.radio("Select Input Method", ["Upload File (PDF/Image)", "Mobile Camera Capture"], horizontal=True)
@@ -726,7 +742,6 @@ if app_mode == lang["nav_process"]:
                             save_to_db(parsed_data, st.session_state["username"], st.session_state["workspace"])
                             batch_results.append(parsed_data)
                             
-                            # Email Logic Restored
                             if parsed_data["Audit Status"] != "✅ Approved":
                                 discrepancy_alerts_count += 1
                                 if alert_email_recipient:
@@ -737,7 +752,6 @@ if app_mode == lang["nav_process"]:
                     time.sleep(0.5)
                         
                 if batch_results:
-                    # Update Usage Logic
                     increment_usage(st.session_state["username"], len(batch_results))
                     st.toast('Batch Sensor Auditing Complete!', icon='🎯')
                     st.success("✅ Audit Engine processing finished successfully.")
@@ -821,8 +835,6 @@ elif app_mode == lang["nav_billing"]:
                 st.toast("Upgraded to Enterprise Successfully via Simulated Stripe Checkout!", icon="💸")
                 time.sleep(1)
                 st.rerun()
-
-# 🟢 THE RETURN OF ALL OTHER AMAZING FEATURES (Restored!) 🟢
 
 elif app_mode == lang["nav_review"]:
     st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
