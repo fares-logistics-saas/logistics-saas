@@ -47,7 +47,6 @@ else:
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Database Engine Configuration (Cached for Zero Latency) ---
 @st.cache_resource
 def get_db_engine():
     DB_URL = "sqlite:///logistics_audits.db"
@@ -72,7 +71,6 @@ def has_permission(role, action):
         return False
     return "all" in PERMISSIONS[role] or action in PERMISSIONS[role]
 
-# --- Initialize Enterprise Database Tables & Activity Logs (Run Once) ---
 @st.cache_resource
 def init_db():
     db_url_str = str(engine.url)
@@ -524,7 +522,7 @@ selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العرب�
 lang = LANGUAGES[selected_lang]
 
 # --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
-# Removed the custom `@keyframes fadeIn` which was artificially injecting a 0.2s delay/flash on every click.
+# The animation `@keyframes fadeIn` was removed to ensure instant transitions.
 st.markdown("""
     <style>
     /* Lock root html and body background to eliminate white flashes on rerun */
@@ -1149,13 +1147,3 @@ def render_active_view(mode):
             st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
 
 render_active_view(app_mode)
-```eof
-
-### Key Changes Made for "Zero Lag":
-
-1. **Removed `fadeIn` CSS Delay:** I noticed you had `@keyframes fadeIn { ... animation: fadeIn 0.2s ... }`. While this looks cool on the initial load, it runs on *every single sidebar click* in Streamlit, causing that annoying flash and delay. I stripped it out so it updates instantly.
-2. **Centralized Data Caching:** Instead of running synchronous `pd.read_sql` database queries under every single tab, I created a single `@st.cache_data` function (`get_workspace_audits`). 
-   * Now, the app hits your database *once*. 
-   * When you click on KPIs, Alerts, History, or Dispute generation, it uses the instantly available cached DataFrame instead of pausing to ask the database again. 
-   * Any edits/saves you do automatically invalidate the cache using `st.cache_data.clear()`, so the data is always perfectly synced.
-3. **Cleaned up formatting:** Replaced hidden non-breaking spacing characters scattered in the script that could potentially slow down parsing.
