@@ -539,6 +539,38 @@ LANGUAGES = {
     }
 }
 
+# --- إضافة اللوجو الاحترافي في الشريط الجانبي ---
+logo_svg = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="120" rx="16" fill="#030712" />
+
+  <g transform="translate(20, 20)">
+    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
+    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
+    <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+    <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+    <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
+    <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <text x="115" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan></text>
+  <text x="117" y="80" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#94a3b8" letter-spacing="2.5">SaaS ENTERPRISE ENGINE</text>
+</svg>
+"""
+st.sidebar.markdown(logo_svg, unsafe_allow_html=True)
+st.sidebar.markdown("---")
+
 st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
@@ -929,17 +961,17 @@ def render_active_view(mode):
                                         if sent:
                                             emails_sent_count += 1
                         
-                    if batch_results:
-                        increment_usage(st.session_state["username"], len(batch_results))
-                        st.toast('Batch Sensor Auditing Complete!', icon='🎯')
-                        st.success("✅ Audit Engine processing finished successfully with robust error checking.")
-                        
-                        if discrepancy_alerts_count > 0:
-                            st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
-                            if emails_sent_count > 0:
-                                st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
-                                
-                        st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
+                        if batch_results:
+                            increment_usage(st.session_state["username"], len(batch_results))
+                            st.toast('Batch Sensor Auditing Complete!', icon='🎯')
+                            st.success("✅ Audit Engine processing finished successfully with robust error checking.")
+                            
+                            if discrepancy_alerts_count > 0:
+                                st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
+                                if emails_sent_count > 0:
+                                    st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
+                                    
+                            st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
 
     elif mode == lang["nav_billing"]:
         st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
