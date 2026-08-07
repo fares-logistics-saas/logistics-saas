@@ -514,7 +514,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- UI Styling Theme (Updated for uniform Log out style on all buttons and steppers) ---
+# --- UI Styling Theme ---
 st.markdown("""
     <style>
     [data-testid="InputInstructions"], 
@@ -544,7 +544,6 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    /* Uniform Log out button style applied to ALL buttons, steppers, and file uploaders */
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
@@ -579,7 +578,6 @@ st.markdown("""
         outline: none !important;
     }
 
-    /* Remove unwanted rectangles/containers above or around number inputs and widgets */
     div[data-baseweb="spinbutton"], div[data-testid="stNumberInput"] {
         background: transparent !important;
         border: none !important;
@@ -751,6 +749,7 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("🌍 Multi-Currency & Settings")
 selected_currency = st.sidebar.selectbox("Operating Currency", ["USD ($)", "JOD (JD)", "EUR (€)"])
+min_ocean_freight = st.sidebar.number_input("Min Allowed Ocean Freight", value=700.0)
 max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3000.0)
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
@@ -811,7 +810,9 @@ def parse_invoice_with_ai(text, filename, currency):
     if freight_match:
         val = float(freight_match.group(1).replace(",", ""))
         if val > max_ocean_freight:
-            data["Audit Status"] = "⚠️ Freight Discrepancy"
+            data["Audit Status"] = "⚠️ Freight Discrepancy (Above Max Cap)"
+        elif val < min_ocean_freight:
+            data["Audit Status"] = "⚠️ Freight Discrepancy (Below Min Floor)"
     return data
 
 if app_mode == lang["nav_process"]:
