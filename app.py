@@ -5,7 +5,6 @@ import hashlib
 import smtplib
 import json
 import requests
-import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -218,8 +217,23 @@ PLAN_LIMITS = {
 }
 
 def create_paddle_checkout(plan_name, price_id, current_username):
-    # This prepares the environment for Paddle Checkout.
-    # Currently defaults to simulation update so your users can upgrade seamlessly inside Streamlit.
+    if not PADDLE_API_KEY or not price_id:
+        return None
+    try:
+        headers = {
+            "Authorization": f"Bearer {PADDLE_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "items": [{"price_id": price_id, "quantity": 1}],
+            "custom_data": {"username": current_username}
+        }
+        res = requests.post("https://api.paddle.com/transactions", json=payload, headers=headers)
+        if res.status_code == 201:
+            data = res.json()
+            return data["data"]["checkout"]["url"]
+    except Exception:
+        pass
     return None
 
 def send_email_alert(recipient_email, filename, audit_status, container_no):
@@ -486,7 +500,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق: إبادة تامة للحدود وجعل كل العناصر والزرار زجاجية وموحدة ---
+# --- تصميم الثيم الساحق ---
 st.markdown("""
     <style>
     [data-testid="InputInstructions"], 
@@ -687,9 +701,17 @@ if not st.session_state["logged_in"]:
                         st.session_state["username"] = l_user.strip()
                         st.session_state["role"] = role
                         st.session_state["workspace"] = workspace
+                        
+                        # منطق التحقق من عدد مرات الدخول (Welcome مقابل Welcome back)
+                        with engine.connect() as conn:
+                            log_count = conn.execute(sqlalchemy.text("SELECT COUNT(*) FROM activity_logs WHERE username = :u AND action = 'USER_LOGIN'"), {"u": l_user.strip()}).scalar()
+                        
+                        if log_count == 0:
+                            st.toast(f"Welcome, {l_user.strip()}!", icon="👋")
+                        else:
+                            st.toast(f"Welcome back, {l_user.strip()}!", icon="👋")
+                            
                         log_activity(l_user.strip(), workspace, "USER_LOGIN")
-                        st.toast(f"Welcome back, {l_user}!", icon="👋")
-                        time.sleep(1)
                         st.rerun()
                     else:
                         st.error("Invalid Username, Password, or MFA Code.")
@@ -846,11 +868,13 @@ if app_mode == lang["nav_process"]:
             if len(uploaded_files) > remaining:
                 st.error(f"⚠️ You are trying to upload {len(uploaded_files)} files, but you only have {remaining} scans left. Please upgrade.")
             else:
-                with st.spinner(f"🚀 AI Engine is extracting & auditing {len(uploaded_files)} invoice(s)..."):
+                # استخدام st.status التفاعلية لإعطاء شعور بالسرعة والاحترافية والشفافية
+                with st.status(f"🚀 بدء معالجة وتدقيق {len(uploaded_files)} ملف(ات)...", expanded=True) as status:
                     batch_results = []
                     discrepancy_alerts_count = 0
                     emails_sent_count = 0
                     
+                    st.write("📄 قراءة الملفات واستخراج النصوص...")
                     for uploaded_file in uploaded_files:
                         temp_file_path = f"temp_{getattr(uploaded_file, 'name', 'camera_capture.jpg')}"
                         raw_text = ""
@@ -867,18 +891,22 @@ if app_mode == lang["nav_process"]:
                         
                         fname = getattr(uploaded_file, 'name', 'mobile_capture.jpg')
                         if raw_text.strip():
+                            st.write(f"🤖 تشغيل محرك الذكاء الاصطناعي للملف: {fname}...")
                             parsed_data = parse_invoice_with_ai(raw_text, fname, selected_currency)
+                            
+                            st.write(f"💾 حفظ البيانات في قاعدة البيانات السحابية...")
                             save_to_db(parsed_data, st.session_state["username"], st.session_state["workspace"])
                             batch_results.append(parsed_data)
                             
                             if parsed_data["Audit Status"] != "✅ Approved":
                                 discrepancy_alerts_count += 1
                                 if alert_email_recipient:
+                                    st.write(f"📧 إرسال تنبيه الفروقات المالية عبر البريد...")
                                     sent = send_email_alert(alert_email_recipient, parsed_data["Filename"], parsed_data["Audit Status"], parsed_data["Container No"])
                                     if sent:
                                         emails_sent_count += 1
                     
-                    time.sleep(0.5)
+                    status.update(label="✅ تمت عملية المعالجة والتدقيق بنجاح تام!", state="complete", expanded=False)
                         
                 if batch_results:
                     increment_usage(st.session_state["username"], len(batch_results))
@@ -939,12 +967,7 @@ elif app_mode == lang["nav_billing"]:
             if checkout_url:
                 st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
             else:
-                if st.button("💳 Upgrade to Pro (Activate via Paddle)", key="btn_pro"):
-                    upgrade_tier(st.session_state["username"], "Pro")
-                    log_activity(st.session_state["username"], st.session_state["workspace"], "UPGRADE_PLAN", "Pro")
-                    st.toast("Upgraded to Pro Successfully via Paddle Activation!", icon="💸")
-                    time.sleep(1)
-                    st.rerun()
+                st.error("⚠️ فشل الاتصال مع Paddle. يرجى مراجعة إعدادات المفاتيح (Secrets).")
 
     with col3:
         st.markdown("""
@@ -968,12 +991,7 @@ elif app_mode == lang["nav_billing"]:
             if checkout_url_ent:
                 st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
             else:
-                if st.button("💳 Upgrade to Enterprise (Activate via Paddle)", key="btn_ent"):
-                    upgrade_tier(st.session_state["username"], "Enterprise")
-                    log_activity(st.session_state["username"], st.session_state["workspace"], "UPGRADE_PLAN", "Enterprise")
-                    st.toast("Upgraded to Enterprise Successfully via Paddle Activation!", icon="💸")
-                    time.sleep(1)
-                    st.rerun()
+                st.error("⚠️ فشل الاتصال مع Paddle. يرجى مراجعة إعدادات المفاتيح (Secrets).")
 
 elif app_mode == lang["nav_review"]:
     st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
@@ -996,7 +1014,6 @@ elif app_mode == lang["nav_review"]:
                     log_activity(st.session_state["username"], st.session_state["workspace"], "VERIFY_RECORD", row['id'])
                     st.cache_data.clear()
                     st.toast(f"Record #{row['id']} verified!", icon="💾")
-                    time.sleep(0.5)
                     st.rerun()
     else:
         st.success("🎉 No pending invoices in your review queue. All records are verified!")
@@ -1040,7 +1057,6 @@ elif app_mode == lang["nav_workflow"]:
                     log_activity(st.session_state["username"], st.session_state["workspace"], "CFO_APPROVE", row['id'])
                     st.cache_data.clear()
                     st.toast(f"Discrepancy #{row['id']} approved by CFO!", icon="✍️")
-                    time.sleep(0.5)
                     st.rerun()
         else:
             st.success("🎉 No high-value discrepancies pending CFO approval.")
@@ -1051,14 +1067,12 @@ elif app_mode == lang["nav_voice"]:
     st.subheader("🎙️ AI Voice & Text Audit Assistant")
     user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
     if st.button("Ask AI"):
-        with st.spinner("🤖 Thinking..."):
-            time.sleep(1)
-            if "leakage" in user_query.lower() or "هدر" in user_query.lower():
-                df_temp = pd.read_sql("SELECT * FROM audits WHERE workspace = :w", engine, params={"w": st.session_state["workspace"]})
-                disc = len(df_temp[df_temp["status"] != "✅ Approved"])
-                st.info(f"🤖 AI Assistant: Based on your workspace database, you have {disc} flagged discrepancies with an estimated financial leakage impact of ${disc * 450:,.2f}.")
-            else:
-                st.info("🤖 AI Assistant: All workspace audit logs are synchronized and fully operational. No critical risks detected.")
+        if "leakage" in user_query.lower() or "هدر" in user_query.lower():
+            df_temp = pd.read_sql("SELECT * FROM audits WHERE workspace = :w", engine, params={"w": st.session_state["workspace"]})
+            disc = len(df_temp[df_temp["status"] != "✅ Approved"])
+            st.info(f"🤖 AI Assistant: Based on your workspace database, you have {disc} flagged discrepancies with an estimated financial leakage impact of ${disc * 450:,.2f}.")
+        else:
+            st.info("🤖 AI Assistant: All workspace audit logs are synchronized and fully operational. No critical risks detected.")
 
 elif app_mode == lang["nav_history"]:
     st.subheader("🗄️ Enterprise Cloud Database Logs")
@@ -1113,13 +1127,12 @@ elif app_mode == lang["nav_scheduler"]:
     if has_permission(st.session_state["role"], "schedule_reports"):
         sched_email = st.text_input("Recipient Email for Scheduled Report", value="cfo@logistics-saas.com")
         if st.button("🚀 Trigger & Send Immediate Executive Report"):
-            with st.spinner("Compiling PDF and dispatching email..."):
-                df_rep = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
-                if send_automated_report(sched_email, df_rep):
-                    log_activity(st.session_state["username"], st.session_state["workspace"], "SEND_SCHEDULED_REPORT", sched_email)
-                    st.success("✅ Executive Report dispatched successfully via email!")
-                else:
-                    st.error("❌ Failed to send report. Please verify SMTP settings in Streamlit Secrets.")
+            df_rep = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
+            if send_automated_report(sched_email, df_rep):
+                log_activity(st.session_state["username"], st.session_state["workspace"], "SEND_SCHEDULED_REPORT", sched_email)
+                st.success("✅ Executive Report dispatched successfully via email!")
+            else:
+                st.error("❌ Failed to send report. Please verify SMTP settings in Streamlit Secrets.")
     else:
         st.warning("Unauthorized: Only CFO or Admin roles can schedule or trigger automated reports.")
 
@@ -1136,16 +1149,12 @@ elif app_mode == lang["nav_tariff"]:
     st.subheader("🏷️ AI Customs Tariff & HS Code Auto-Classifier")
     item_desc = st.text_input("Enter Goods Description (e.g., 'MacBook Pro M3 Laptop', 'Industrial Hydraulic Pump')")
     if st.button("Calculate Tariff & Classify"):
-        with st.spinner("Analyzing Customs Code..."):
-            time.sleep(1)
-            st.success("✅ HS Code Classified: **8471.30 (Portable Digital Automatic Data Processing Machines)**")
-            st.info("Estimated Customs Duty: **5%** | Import VAT: **16%** | Standard Compliance: **Verified**")
+        st.success("✅ HS Code Classified: **8471.30 (Portable Digital Automatic Data Processing Machines)**")
+        st.info("Estimated Customs Duty: **5%** | Import VAT: **16%** | Standard Compliance: **Verified**")
 
 elif app_mode == lang["nav_erp"]:
     st.subheader("🔌 ERP & Webhook Integrations")
     webhook_url = st.text_input("Enterprise ERP Webhook Endpoint URL", value="https://api.yourcompany.com/erp/v1/webhooks/audit")
     if st.button("🧪 Test Webhook & Sync Verified Audits"):
-        with st.spinner("Syncing to ERP..."):
-            time.sleep(1)
-            log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
-            st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
+        log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
+        st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
