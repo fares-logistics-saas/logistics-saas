@@ -539,9 +539,10 @@ LANGUAGES = {
     }
 }
 
-# --- اللوجو الاحترافي بالحجم الأمثل والشكل الجانبي ---
+# --- اللوجو الشفاف الجانبي مع تأثيرات التفاعل (Hover) المماثلة للأزرار ---
 logo_svg = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 370 96" width="100%" height="100%">
+<div class="custom-logo-container">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 75" width="100%" height="100%">
   <defs>
     <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b82f6" />
@@ -553,9 +554,7 @@ logo_svg = """
     </linearGradient>
   </defs>
 
-  <rect width="370" height="96" rx="12" fill="#030712" />
-
-  <g transform="translate(10, 8) scale(1.1)">
+  <g transform="translate(5, 2) scale(0.65)">
     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -564,9 +563,10 @@ logo_svg = """
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
 
-  <text x="110" y="46" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan></text>
-  <text x="112" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="500" fill="#94a3b8" letter-spacing="2.5">SaaS ENTERPRISE ENGINE</text>
+  <text x="75" y="34" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan></text>
+  <text x="76" y="52" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="500" fill="#94a3b8" letter-spacing="1.5">SaaS ENTERPRISE ENGINE</text>
 </svg>
+</div>
 """
 st.sidebar.markdown(logo_svg, unsafe_allow_html=True)
 st.sidebar.markdown("---")
@@ -611,6 +611,22 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
+    .custom-logo-container {
+        padding: 6px 8px;
+        border-radius: 12px;
+        background: transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        margin-bottom: -0.5rem;
+        cursor: pointer;
+        border: 1px solid transparent;
+    }
+    .custom-logo-container:hover {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        border-color: rgba(59, 130, 246, 0.3);
+        transform: translateY(-1px);
+    }
+
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
