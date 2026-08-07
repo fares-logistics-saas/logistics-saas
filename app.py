@@ -539,9 +539,9 @@ LANGUAGES = {
     }
 }
 
-# --- اللوجو الشفاف المتمركز في الشريط الجانبي ---
+# --- اللوجو الشفاف المدمج والمتمركز بدقة بدون مساحات زائدة ---
 logo_svg = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 105" width="100%" height="100%">
   <defs>
     <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b82f6" />
@@ -553,8 +553,8 @@ logo_svg = """
     </linearGradient>
   </defs>
 
-  <!-- Centered Icon -->
-  <g transform="translate(110, 5) scale(1)">
+  <!-- Centered Compact Icon -->
+  <g transform="translate(115, -2) scale(0.75)">
     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -563,9 +563,9 @@ logo_svg = """
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
 
-  <!-- Centered Text -->
-  <text x="150" y="112" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan></text>
-  <text x="150" y="132" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="500" fill="#94a3b8" letter-spacing="2" text-anchor="middle">SaaS ENTERPRISE ENGINE</text>
+  <!-- Centered Compact Text -->
+  <text x="150" y="76" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan></text>
+  <text x="150" y="92" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="500" fill="#94a3b8" letter-spacing="1.5" text-anchor="middle">SaaS ENTERPRISE ENGINE</text>
 </svg>
 """
 st.sidebar.markdown(logo_svg, unsafe_allow_html=True)
