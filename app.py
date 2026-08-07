@@ -539,10 +539,10 @@ LANGUAGES = {
     }
 }
 
-# --- اللوجو الشفاف المتمركز مع أيقونة أكبر قليلاً ومرفوعة ---
+# --- اللوجو الشفاف المتمركز بدقة مع تقليل المسافة وكبر الحجم ---
 logo_svg = """
 <div class="custom-logo-container">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
   <defs>
     <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b82f6" />
@@ -554,8 +554,8 @@ logo_svg = """
     </linearGradient>
   </defs>
 
-  <!-- Centered Larger Icon, Perfectly Positioned -->
-  <g transform="translate(121, -8) scale(0.68)">
+  <!-- Centered Larger Icon, Closer to Text -->
+  <g transform="translate(118, -2) scale(0.72)">
     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -564,8 +564,8 @@ logo_svg = """
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
 
-  <!-- Centered Single Line Text -->
-  <text x="150" y="58" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+  <!-- Centered Single Line Text, Closer to Logo -->
+  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 """
