@@ -514,7 +514,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- UI Styling Theme (Fixed Number Input Stepper Separation & Clean Boxes) ---
+# --- UI Styling Theme (Zero-Lag Focus & Clean Blue UI) ---
 st.markdown("""
     <style>
     [data-testid="InputInstructions"], 
@@ -544,7 +544,6 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    /* Main action buttons & Log out button style */
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
@@ -573,7 +572,6 @@ st.markdown("""
         outline: none !important;
     }
 
-    /* Properly scoped & separated styles for number input / stepper buttons (+ and -) */
     div[data-baseweb="spinbutton"] button, 
     .stNumberInput button {
         background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(29, 78, 216, 1) 100%) !important;
@@ -593,11 +591,10 @@ st.markdown("""
         transform: scale(1.05) !important;
     }
 
-    /* Clean input fields without unwanted artifacts */
     [data-baseweb="input"], 
     [data-baseweb="base-input"], 
     [data-baseweb="select"] > div {
-        border: none !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
         border-radius: 12px !important;
         background-color: rgba(15, 23, 42, 0.7) !important;
         outline: none !important;
@@ -609,7 +606,8 @@ st.markdown("""
     [data-baseweb="input"]:hover, 
     [data-baseweb="base-input"]:hover, 
     [data-baseweb="select"] > div:hover {
-        box-shadow: 0 0 20px rgba(96, 165, 250, 0.6) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.6) !important;
         outline: none !important;
     }
     
@@ -825,7 +823,8 @@ def parse_invoice_with_ai(text, filename, currency):
             data["Audit Status"] = "⚠️ Freight Discrepancy (Below Min Floor)"
     return data
 
-if app_mode == lang["nav_process"]:
+@st.fragment
+def render_process_mode():
     st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
     
     limit = PLAN_LIMITS[user_tier]
@@ -898,6 +897,9 @@ if app_mode == lang["nav_process"]:
                             st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
                             
                     st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
+
+if app_mode == lang["nav_process"]:
+    render_process_mode()
 
 elif app_mode == lang["nav_billing"]:
     st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
