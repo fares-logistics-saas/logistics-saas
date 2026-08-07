@@ -514,9 +514,18 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- UI Styling Theme (Zero-Lag Focus & Clean Blue UI) ---
+# --- UI Styling Theme (Smooth Fade-In Transition to eliminate visual pop) ---
 st.markdown("""
     <style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    [data-testid="stMain"] {
+        animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
     [data-testid="InputInstructions"], 
     div[data-testid="stFormSubmitInstructions"],
     .st-emotion-cache-1kyxreq,
