@@ -824,318 +824,318 @@ def parse_invoice_with_ai(text, filename, currency):
     return data
 
 @st.fragment
-def render_process_mode():
-    st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
-    
-    limit = PLAN_LIMITS[user_tier]
-    remaining = limit - invoices_processed
-    
-    if remaining <= 0:
-        st.error(f"🛑 Usage Limit Reached! Your {user_tier} plan allows {limit} invoices max. Please upgrade your account to continue auditing.")
-        st.info("Navigate to 💼 Finance & Billing -> 💎 Billing & Subscriptions to upgrade.")
-    else:
-        st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
+def render_active_view(mode):
+    if mode == lang["nav_process"]:
+        st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
         
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            input_method = st.radio("Select Input Method", ["Upload File (PDF/Image)", "Mobile Camera Capture"], horizontal=True)
+        limit = PLAN_LIMITS[user_tier]
+        remaining = limit - invoices_processed
+        
+        if remaining <= 0:
+            st.error(f"🛑 Usage Limit Reached! Your {user_tier} plan allows {limit} invoices max. Please upgrade your account to continue auditing.")
+            st.info("Navigate to 💼 Finance & Billing -> 💎 Billing & Subscriptions to upgrade.")
+        else:
+            st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
             
-        uploaded_files = []
-        if input_method == "Upload File (PDF/Image)":
-            uploaded_files = st.file_uploader("Choose invoice files (Multiple allowed)", type=["pdf", "png", "jpg"], accept_multiple_files=True)
-        else:
-            cam_file = st.camera_input("Capture Invoice with Mobile Camera")
-            if cam_file:
-                uploaded_files = [cam_file]
-
-        if uploaded_files:
-            if len(uploaded_files) > remaining:
-                st.error(f"⚠️ You are trying to upload {len(uploaded_files)} files, but you only have {remaining} scans left. Please upgrade.")
-            else:
-                with st.status(f"🚀 Processing and auditing {len(uploaded_files)} file(s)...", expanded=True) as status:
-                    batch_results = []
-                    discrepancy_alerts_count = 0
-                    emails_sent_count = 0
-                    
-                    for uploaded_file in uploaded_files:
-                        temp_file_path = f"temp_{getattr(uploaded_file, 'name', 'camera_capture.jpg')}"
-                        raw_text = ""
-                        if getattr(uploaded_file, 'type', '') == "application/pdf":
-                            with open(temp_file_path, "wb") as f:
-                                f.write(uploaded_file.getbuffer())
-                            raw_text = extract_text_from_pdf(temp_file_path)
-                        else:
-                            try:
-                                image = Image.open(uploaded_file)
-                                raw_text = pytesseract.image_to_string(image)
-                            except Exception:
-                                pass
-                        
-                        fname = getattr(uploaded_file, 'name', 'mobile_capture.jpg')
-                        if raw_text.strip():
-                            parsed_data = parse_invoice_with_ai(raw_text, fname, selected_currency)
-                            save_to_db(parsed_data, st.session_state["username"], st.session_state["workspace"])
-                            batch_results.append(parsed_data)
-                            
-                            if parsed_data["Audit Status"] != "✅ Approved":
-                                discrepancy_alerts_count += 1
-                                if alert_email_recipient:
-                                    sent = send_email_alert(alert_email_recipient, parsed_data["Filename"], parsed_data["Audit Status"], parsed_data["Container No"])
-                                    if sent:
-                                        emails_sent_count += 1
-                    
-                    status.update(label="✅ Processing & Auditing Complete!", state="complete", expanded=False)
-                        
-                if batch_results:
-                    increment_usage(st.session_state["username"], len(batch_results))
-                    st.toast('Batch Sensor Auditing Complete!', icon='🎯')
-                    st.success("✅ Audit Engine processing finished successfully.")
-                    
-                    if discrepancy_alerts_count > 0:
-                        st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
-                        if emails_sent_count > 0:
-                            st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
-                            
-                    st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
-
-if app_mode == lang["nav_process"]:
-    render_process_mode()
-
-elif app_mode == lang["nav_billing"]:
-    st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
-    st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
-    
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
-            <h2 style="color: white;">Free Tier</h2>
-            <h1 style="color: #60a5fa;">$0<span style="font-size: 14px; color: gray;">/mo</span></h1>
-            <p>Perfect for testing.</p>
-            <hr style="border-color: rgba(96, 165, 250, 0.3);">
-            <ul style="text-align: left; color: white;">
-                <li>5 Invoice Scans Total</li>
-                <li>Basic Dashboard</li>
-                <li>Community Support</li>
-            </ul>
-        </div>
-        <br>
-        """, unsafe_allow_html=True)
-        if user_tier == "Free":
-            st.button("Current Plan", disabled=True, key="btn_free")
-            
-    with col2:
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
-            <h2 style="color: white;">Pro Tier 🚀</h2>
-            <h1 style="color: #60a5fa;">$150<span style="font-size: 14px; color: gray;">/mo</span></h1>
-            <p>For growing logistics firms.</p>
-            <hr style="border-color: rgba(96, 165, 250, 0.3);">
-            <ul style="text-align: left; color: white;">
-                <li>50 Invoice Scans / month</li>
-                <li>PDF Executive Reports</li>
-                <li>Priority Email Alerts</li>
-            </ul>
-        </div>
-        <br>
-        """, unsafe_allow_html=True)
-        if user_tier == "Pro":
-            st.button("Current Plan", disabled=True, key="btn_pro_cur")
-        else:
-            checkout_url = create_paddle_checkout("Pro", PRO_PRICE_ID, st.session_state["username"])
-            if checkout_url:
-                st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
-            else:
-                st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
-
-    with col3:
-        st.markdown("""
-        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
-            <h2 style="color: white;">Enterprise</h2>
-            <h1 style="color: #60a5fa;">$500<span style="font-size: 14px; color: gray;">/mo</span></h1>
-            <p>For global shipping hubs.</p>
-            <hr style="border-color: rgba(96, 165, 250, 0.3);">
-            <ul style="text-align: left; color: white;">
-                <li><b>Unlimited</b> Invoice Scans</li>
-                <li>Full ERP Webhook Access</li>
-                <li>24/7 Dedicated Account Rep</li>
-            </ul>
-        </div>
-        <br>
-        """, unsafe_allow_html=True)
-        if user_tier == "Enterprise":
-            st.button("Current Plan", disabled=True, key="btn_ent_cur")
-        else:
-            checkout_url_ent = create_paddle_checkout("Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"])
-            if checkout_url_ent:
-                st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
-            else:
-                st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
-
-elif app_mode == lang["nav_review"]:
-    st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
-    query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND review_status = 'Pending Review' ORDER BY timestamp DESC")
-    df_pending = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-    if not df_pending.empty:
-        for idx, row in df_pending.iterrows():
-            with st.expander(f"📁 File: {row['filename']} | 📦 Container: {row['container_no']} | 🚦 Status: {row['status']}"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    new_track = st.text_input(f"Tracking ID #{row['id']}", value=row['tracking_id'])
-                    new_cont = st.text_input(f"Container No #{row['id']}", value=row['container_no'])
-                with col2:
-                    new_port = st.text_input(f"Port #{row['id']}", value=row['port'])
-                    new_status = st.selectbox(f"Audit Status #{row['id']}", ["✅ Approved", "⚠️ Freight Discrepancy", "⚠️ Customs Discrepancy"], index=0 if row['status']=="✅ Approved" else 1)
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                input_method = st.radio("Select Input Method", ["Upload File (PDF/Image)", "Mobile Camera Capture"], horizontal=True)
                 
-                if st.button(f"Verify & Commit Record #{row['id']}", key=f"btn_{row['id']}"):
-                    with engine.begin() as conn:
-                        conn.execute(sqlalchemy.text("UPDATE audits SET tracking_id = :t, container_no = :c, port = :p, status = :s, review_status = 'Verified' WHERE id = :id"), {"t": new_track, "c": new_cont, "p": new_port, "s": new_status, "id": row['id']})
-                    log_activity(st.session_state["username"], st.session_state["workspace"], "VERIFY_RECORD", row['id'])
-                    st.cache_data.clear()
-                    st.toast(f"Record #{row['id']} verified!", icon="💾")
-                    st.rerun()
-    else:
-        st.success("🎉 No pending invoices in your review queue. All records are verified!")
+            uploaded_files = []
+            if input_method == "Upload File (PDF/Image)":
+                uploaded_files = st.file_uploader("Choose invoice files (Multiple allowed)", type=["pdf", "png", "jpg"], accept_multiple_files=True)
+            else:
+                cam_file = st.camera_input("Capture Invoice with Mobile Camera")
+                if cam_file:
+                    uploaded_files = [cam_file]
 
-elif app_mode == lang["nav_dispute"]:
-    st.subheader("⚖️ Automated Dispute Letter Generator")
-    query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved' ORDER BY timestamp DESC")
-    df_disputes = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-    if not df_disputes.empty:
-        for _, row in df_disputes.iterrows():
-            st.markdown(f"**File:** {row['filename']} | **Container:** {row['container_no']} | **Status:** {row['status']}")
-            pdf_dispute = generate_dispute_letter_pdf(row['filename'], row['tracking_id'], row['container_no'], row['status'])
-            st.download_button(label=f"📄 Download Legal Dispute Notice ({row['filename']})", data=pdf_dispute, file_name=f"dispute_notice_{row['container_no']}.pdf", mime='application/pdf', key=f"dispute_{row['id']}")
-            st.markdown("---")
-    else:
-        st.info("No flagged discrepancies found for dispute generation.")
+            if uploaded_files:
+                if len(uploaded_files) > remaining:
+                    st.error(f"⚠️ You are trying to upload {len(uploaded_files)} files, but you only have {remaining} scans left. Please upgrade.")
+                else:
+                    with st.status(f"🚀 Processing and auditing {len(uploaded_files)} file(s)...", expanded=True) as status:
+                        batch_results = []
+                        discrepancy_alerts_count = 0
+                        emails_sent_count = 0
+                        
+                        for uploaded_file in uploaded_files:
+                            temp_file_path = f"temp_{getattr(uploaded_file, 'name', 'camera_capture.jpg')}"
+                            raw_text = ""
+                            if getattr(uploaded_file, 'type', '') == "application/pdf":
+                                with open(temp_file_path, "wb") as f:
+                                    f.write(uploaded_file.getbuffer())
+                                raw_text = extract_text_from_pdf(temp_file_path)
+                            else:
+                                try:
+                                    image = Image.open(uploaded_file)
+                                    raw_text = pytesseract.image_to_string(image)
+                                except Exception:
+                                    pass
+                            
+                            fname = getattr(uploaded_file, 'name', 'mobile_capture.jpg')
+                            if raw_text.strip():
+                                parsed_data = parse_invoice_with_ai(raw_text, fname, selected_currency)
+                                save_to_db(parsed_data, st.session_state["username"], st.session_state["workspace"])
+                                batch_results.append(parsed_data)
+                                
+                                if parsed_data["Audit Status"] != "✅ Approved":
+                                    discrepancy_alerts_count += 1
+                                    if alert_email_recipient:
+                                        sent = send_email_alert(alert_email_recipient, parsed_data["Filename"], parsed_data["Audit Status"], parsed_data["Container No"])
+                                        if sent:
+                                            emails_sent_count += 1
+                        
+                        status.update(label="✅ Processing & Auditing Complete!", state="complete", expanded=False)
+                            
+                    if batch_results:
+                        increment_usage(st.session_state["username"], len(batch_results))
+                        st.toast('Batch Sensor Auditing Complete!', icon='🎯')
+                        st.success("✅ Audit Engine processing finished successfully.")
+                        
+                        if discrepancy_alerts_count > 0:
+                            st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
+                            if emails_sent_count > 0:
+                                st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
+                                
+                        st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
 
-elif app_mode == lang["nav_iot"]:
-    st.subheader("🛰️ IoT GPS & Live Carrier Tracking (DHL / Aramex API)")
-    carrier_choice = st.selectbox("Select Carrier for Live Tracking Query", ["DHL", "Aramex", "Maersk"])
-    query_track = st.text_input("Enter Tracking ID or Container No to Live Query")
-    if st.button("Query Live Carrier API"):
-        st.success(f"📡 API Response: {fetch_live_carrier_tracking(query_track, carrier_choice)}")
-        
-    query = sqlalchemy.text("SELECT container_no, port, date, status, iot_status FROM audits WHERE workspace = :w")
-    df_iot = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-    if not df_iot.empty:
-        st.dataframe(df_iot, use_container_width=True)
-
-elif app_mode == lang["nav_workflow"]:
-    st.subheader("👔 Multi-Tier CFO Approval Workflow")
-    if has_permission(st.session_state["role"], "approve_cfo"):
-        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved'")
-        df_cfo = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-        if not df_cfo.empty:
-            for _, row in df_cfo.iterrows():
-                st.markdown(f"**Container:** {row['container_no']} | **Status:** {row['status']} | **CFO Status:** {row['cfo_approval']}")
-                if st.button(f"✍️ CFO Digital Sign & Approve #{row['id']}", key=f"cfo_{row['id']}"):
-                    with engine.begin() as conn:
-                        conn.execute(sqlalchemy.text("UPDATE audits SET cfo_approval = 'Approved by CFO' WHERE id = :id"), {"id": row['id']})
-                    log_activity(st.session_state["username"], st.session_state["workspace"], "CFO_APPROVE", row['id'])
-                    st.cache_data.clear()
-                    st.toast(f"Discrepancy #{row['id']} approved by CFO!", icon="✍️")
-                    st.rerun()
-        else:
-            st.success("🎉 No high-value discrepancies pending CFO approval.")
-    else:
-        st.warning("Unauthorized: Only CFO or Admin roles can access the approval workflow.")
-
-elif app_mode == lang["nav_voice"]:
-    st.subheader("🎙️ AI Voice & Text Audit Assistant")
-    user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
-    if st.button("Ask AI"):
-        if "leakage" in user_query.lower() or "هدر" in user_query.lower():
-            df_temp = pd.read_sql("SELECT * FROM audits WHERE workspace = :w", engine, params={"w": st.session_state["workspace"]})
-            disc = len(df_temp[df_temp["status"] != "✅ Approved"])
-            st.info(f"🤖 AI Assistant: Based on your workspace database, you have {disc} flagged discrepancies with an estimated financial leakage impact of ${disc * 450:,.2f}.")
-        else:
-            st.info("🤖 AI Assistant: All workspace audit logs are synchronized and fully operational. No critical risks detected.")
-
-elif app_mode == lang["nav_history"]:
-    st.subheader("🗄️ Enterprise Cloud Database Logs")
-    query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w ORDER BY timestamp DESC")
-    df_history = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-    if not df_history.empty:
-        st.dataframe(df_history, use_container_width=True)
-        col_csv, col_pdf = st.columns(2)
-        with col_csv:
-            csv_history = df_history.to_csv(index=False).encode('utf-8')
-            st.download_button(label="📥 Download History (CSV)", data=csv_history, file_name='audit_history.csv', mime='text/csv')
-        with col_pdf:
-            pdf_buffer = generate_executive_pdf(df_history, f"Immutable Audit Trails - Workspace: {st.session_state['workspace']}")
-            st.download_button(label="📄 Download Executive Report (PDF)", data=pdf_buffer, file_name='audit_history_executive.pdf', mime='application/pdf')
-    else:
-        st.info("No historical records found.")
-
-elif app_mode == lang["nav_kpi"]:
-    st.subheader("📈 Executive Logistics Analytics & KPIs")
-    df_analytics = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
-    if not df_analytics.empty:
-        total_audits = len(df_analytics)
-        approved_count = len(df_analytics[df_analytics["status"] == "✅ Approved"])
-        discrepancy_count = total_audits - approved_count
-        estimated_savings = discrepancy_count * 450.0
-        
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Invoices Audited", total_audits)
-        col2.metric("Approved Invoices", approved_count)
-        col3.metric("Discrepancies Flagged", discrepancy_count)
-        col4.metric("Estimated Cost Savings", f"${estimated_savings:,.2f}")
+    elif mode == lang["nav_billing"]:
+        st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
+        st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
         
         st.markdown("---")
-        fig_pie = px.pie(df_analytics, names='status', title='Audit Status Breakdown', hole=0.4, color_discrete_sequence=['#10b981', '#2563eb', '#f59e0b'])
-        fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="white")
-        st.plotly_chart(fig_pie, use_container_width=True)
-    else:
-        st.info("No data available for analytics yet.")
-
-elif app_mode == lang["nav_alerts"]:
-    st.subheader("🚨 Automated Discrepancy Alerts Center")
-    query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved' ORDER BY timestamp DESC")
-    df_alerts = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-    if not df_alerts.empty:
-        st.error(f"⚠️ Total Active Discrepancy Alerts Requiring Attention: {len(df_alerts)}")
-        st.dataframe(df_alerts, use_container_width=True)
-    else:
-        st.success("🎉 Outstanding! No discrepancy alerts found.")
-
-elif app_mode == lang["nav_scheduler"]:
-    st.subheader("📅 Automated Report Scheduler & Dispatcher")
-    if has_permission(st.session_state["role"], "schedule_reports"):
-        sched_email = st.text_input("Recipient Email for Scheduled Report", value="cfo@logistics-saas.com")
-        if st.button("🚀 Trigger & Send Immediate Executive Report"):
-            df_rep = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
-            if send_automated_report(sched_email, df_rep):
-                log_activity(st.session_state["username"], st.session_state["workspace"], "SEND_SCHEDULED_REPORT", sched_email)
-                st.success("✅ Executive Report dispatched successfully via email!")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
+                <h2 style="color: white;">Free Tier</h2>
+                <h1 style="color: #60a5fa;">$0<span style="font-size: 14px; color: gray;">/mo</span></h1>
+                <p>Perfect for testing.</p>
+                <hr style="border-color: rgba(96, 165, 250, 0.3);">
+                <ul style="text-align: left; color: white;">
+                    <li>5 Invoice Scans Total</li>
+                    <li>Basic Dashboard</li>
+                    <li>Community Support</li>
+                </ul>
+            </div>
+            <br>
+            """, unsafe_allow_html=True)
+            if user_tier == "Free":
+                st.button("Current Plan", disabled=True, key="btn_free")
+                
+        with col2:
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
+                <h2 style="color: white;">Pro Tier 🚀</h2>
+                <h1 style="color: #60a5fa;">$150<span style="font-size: 14px; color: gray;">/mo</span></h1>
+                <p>For growing logistics firms.</p>
+                <hr style="border-color: rgba(96, 165, 250, 0.3);">
+                <ul style="text-align: left; color: white;">
+                    <li>50 Invoice Scans / month</li>
+                    <li>PDF Executive Reports</li>
+                    <li>Priority Email Alerts</li>
+                </ul>
+            </div>
+            <br>
+            """, unsafe_allow_html=True)
+            if user_tier == "Pro":
+                st.button("Current Plan", disabled=True, key="btn_pro_cur")
             else:
-                st.error("❌ Failed to send report. Please verify SMTP settings in Streamlit Secrets.")
-    else:
-        st.warning("Unauthorized: Only CFO or Admin roles can schedule or trigger automated reports.")
+                checkout_url = create_paddle_checkout("Pro", PRO_PRICE_ID, st.session_state["username"])
+                if checkout_url:
+                    st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
+                else:
+                    st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
 
-elif app_mode == "Vendor Risk Assessment":
-    st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
-    query = sqlalchemy.text("SELECT username, workspace, status, COUNT(*) as count FROM audits WHERE workspace = :w GROUP BY username, workspace, status")
-    df_vendor = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-    if not df_vendor.empty:
-        st.dataframe(df_vendor, use_container_width=True)
-    else:
-        st.info("No vendor assessment data available yet.")
+        with col3:
+            st.markdown("""
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
+                <h2 style="color: white;">Enterprise</h2>
+                <h1 style="color: #60a5fa;">$500<span style="font-size: 14px; color: gray;">/mo</span></h1>
+                <p>For global shipping hubs.</p>
+                <hr style="border-color: rgba(96, 165, 250, 0.3);">
+                <ul style="text-align: left; color: white;">
+                    <li><b>Unlimited</b> Invoice Scans</li>
+                    <li>Full ERP Webhook Access</li>
+                    <li>24/7 Dedicated Account Rep</li>
+                </ul>
+            </div>
+            <br>
+            """, unsafe_allow_html=True)
+            if user_tier == "Enterprise":
+                st.button("Current Plan", disabled=True, key="btn_ent_cur")
+            else:
+                checkout_url_ent = create_paddle_checkout("Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"])
+                if checkout_url_ent:
+                    st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
+                else:
+                    st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
 
-elif app_mode == lang["nav_tariff"]:
-    st.subheader("🏷️ AI Customs Tariff & HS Code Auto-Classifier")
-    item_desc = st.text_input("Enter Goods Description (e.g., 'MacBook Pro M3 Laptop', 'Industrial Hydraulic Pump')")
-    if st.button("Calculate Tariff & Classify"):
-        st.success("✅ HS Code Classified: **8471.30 (Portable Digital Automatic Data Processing Machines)**")
-        st.info("Estimated Customs Duty: **5%** | Import VAT: **16%** | Standard Compliance: **Verified**")
+    elif mode == lang["nav_review"]:
+        st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
+        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND review_status = 'Pending Review' ORDER BY timestamp DESC")
+        df_pending = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        if not df_pending.empty:
+            for idx, row in df_pending.iterrows():
+                with st.expander(f"📁 File: {row['filename']} | 📦 Container: {row['container_no']} | 🚦 Status: {row['status']}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_track = st.text_input(f"Tracking ID #{row['id']}", value=row['tracking_id'])
+                        new_cont = st.text_input(f"Container No #{row['id']}", value=row['container_no'])
+                    with col2:
+                        new_port = st.text_input(f"Port #{row['id']}", value=row['port'])
+                        new_status = st.selectbox(f"Audit Status #{row['id']}", ["✅ Approved", "⚠️ Freight Discrepancy", "⚠️ Customs Discrepancy"], index=0 if row['status']=="✅ Approved" else 1)
+                    
+                    if st.button(f"Verify & Commit Record #{row['id']}", key=f"btn_{row['id']}"):
+                        with engine.begin() as conn:
+                            conn.execute(sqlalchemy.text("UPDATE audits SET tracking_id = :t, container_no = :c, port = :p, status = :s, review_status = 'Verified' WHERE id = :id"), {"t": new_track, "c": new_cont, "p": new_port, "s": new_status, "id": row['id']})
+                        log_activity(st.session_state["username"], st.session_state["workspace"], "VERIFY_RECORD", row['id'])
+                        st.cache_data.clear()
+                        st.toast(f"Record #{row['id']} verified!", icon="💾")
+                        st.rerun()
+        else:
+            st.success("🎉 No pending invoices in your review queue. All records are verified!")
 
-elif app_mode == lang["nav_erp"]:
-    st.subheader("🔌 ERP & Webhook Integrations")
-    webhook_url = st.text_input("Enterprise ERP Webhook Endpoint URL", value="https://api.yourcompany.com/erp/v1/webhooks/audit")
-    if st.button("🧪 Test Webhook & Sync Verified Audits"):
-        log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
-        st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
+    elif mode == lang["nav_dispute"]:
+        st.subheader("⚖️ Automated Dispute Letter Generator")
+        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved' ORDER BY timestamp DESC")
+        df_disputes = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        if not df_disputes.empty:
+            for _, row in df_disputes.iterrows():
+                st.markdown(f"**File:** {row['filename']} | **Container:** {row['container_no']} | **Status:** {row['status']}")
+                pdf_dispute = generate_dispute_letter_pdf(row['filename'], row['tracking_id'], row['container_no'], row['status'])
+                st.download_button(label=f"📄 Download Legal Dispute Notice ({row['filename']})", data=pdf_dispute, file_name=f"dispute_notice_{row['container_no']}.pdf", mime='application/pdf', key=f"dispute_{row['id']}")
+                st.markdown("---")
+        else:
+            st.info("No flagged discrepancies found for dispute generation.")
+
+    elif mode == lang["nav_iot"]:
+        st.subheader("🛰️ IoT GPS & Live Carrier Tracking (DHL / Aramex API)")
+        carrier_choice = st.selectbox("Select Carrier for Live Tracking Query", ["DHL", "Aramex", "Maersk"])
+        query_track = st.text_input("Enter Tracking ID or Container No to Live Query")
+        if st.button("Query Live Carrier API"):
+            st.success(f"📡 API Response: {fetch_live_carrier_tracking(query_track, carrier_choice)}")
+            
+        query = sqlalchemy.text("SELECT container_no, port, date, status, iot_status FROM audits WHERE workspace = :w")
+        df_iot = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        if not df_iot.empty:
+            st.dataframe(df_iot, use_container_width=True)
+
+    elif mode == lang["nav_workflow"]:
+        st.subheader("👔 Multi-Tier CFO Approval Workflow")
+        if has_permission(st.session_state["role"], "approve_cfo"):
+            query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved'")
+            df_cfo = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+            if not df_cfo.empty:
+                for _, row in df_cfo.iterrows():
+                    st.markdown(f"**Container:** {row['container_no']} | **Status:** {row['status']} | **CFO Status:** {row['cfo_approval']}")
+                    if st.button(f"✍️ CFO Digital Sign & Approve #{row['id']}", key=f"cfo_{row['id']}"):
+                        with engine.begin() as conn:
+                            conn.execute(sqlalchemy.text("UPDATE audits SET cfo_approval = 'Approved by CFO' WHERE id = :id"), {"id": row['id']})
+                        log_activity(st.session_state["username"], st.session_state["workspace"], "CFO_APPROVE", row['id'])
+                        st.cache_data.clear()
+                        st.toast(f"Discrepancy #{row['id']} approved by CFO!", icon="✍️")
+                        st.rerun()
+            else:
+                st.success("🎉 No high-value discrepancies pending CFO approval.")
+        else:
+            st.warning("Unauthorized: Only CFO or Admin roles can access the approval workflow.")
+
+    elif mode == lang["nav_voice"]:
+        st.subheader("🎙️ AI Voice & Text Audit Assistant")
+        user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
+        if st.button("Ask AI"):
+            if "leakage" in user_query.lower() or "هدر" in user_query.lower():
+                df_temp = pd.read_sql("SELECT * FROM audits WHERE workspace = :w", engine, params={"w": st.session_state["workspace"]})
+                disc = len(df_temp[df_temp["status"] != "✅ Approved"])
+                st.info(f"🤖 AI Assistant: Based on your workspace database, you have {disc} flagged discrepancies with an estimated financial leakage impact of ${disc * 450:,.2f}.")
+            else:
+                st.info("🤖 AI Assistant: All workspace audit logs are synchronized and fully operational. No critical risks detected.")
+
+    elif mode == lang["nav_history"]:
+        st.subheader("🗄️ Enterprise Cloud Database Logs")
+        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w ORDER BY timestamp DESC")
+        df_history = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        if not df_history.empty:
+            st.dataframe(df_history, use_container_width=True)
+            col_csv, col_pdf = st.columns(2)
+            with col_csv:
+                csv_history = df_history.to_csv(index=False).encode('utf-8')
+                st.download_button(label="📥 Download History (CSV)", data=csv_history, file_name='audit_history.csv', mime='text/csv')
+            with col_pdf:
+                pdf_buffer = generate_executive_pdf(df_history, f"Immutable Audit Trails - Workspace: {st.session_state['workspace']}")
+                st.download_button(label="📄 Download Executive Report (PDF)", data=pdf_buffer, file_name='audit_history_executive.pdf', mime='application/pdf')
+        else:
+            st.info("No historical records found.")
+
+    elif mode == lang["nav_kpi"]:
+        st.subheader("📈 Executive Logistics Analytics & KPIs")
+        df_analytics = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
+        if not df_analytics.empty:
+            total_audits = len(df_analytics)
+            approved_count = len(df_analytics[df_analytics["status"] == "✅ Approved"])
+            discrepancy_count = total_audits - approved_count
+            estimated_savings = discrepancy_count * 450.0
+            
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Total Invoices Audited", total_audits)
+            col2.metric("Approved Invoices", approved_count)
+            col3.metric("Discrepancies Flagged", discrepancy_count)
+            col4.metric("Estimated Cost Savings", f"${estimated_savings:,.2f}")
+            
+            st.markdown("---")
+            fig_pie = px.pie(df_analytics, names='status', title='Audit Status Breakdown', hole=0.4, color_discrete_sequence=['#10b981', '#2563eb', '#f59e0b'])
+            fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="white")
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("No data available for analytics yet.")
+
+    elif mode == lang["nav_alerts"]:
+        st.subheader("🚨 Automated Discrepancy Alerts Center")
+        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved' ORDER BY timestamp DESC")
+        df_alerts = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        if not df_alerts.empty:
+            st.error(f"⚠️ Total Active Discrepancy Alerts Requiring Attention: {len(df_alerts)}")
+            st.dataframe(df_alerts, use_container_width=True)
+        else:
+            st.success("🎉 Outstanding! No discrepancy alerts found.")
+
+    elif mode == lang["nav_scheduler"]:
+        st.subheader("📅 Automated Report Scheduler & Dispatcher")
+        if has_permission(st.session_state["role"], "schedule_reports"):
+            sched_email = st.text_input("Recipient Email for Scheduled Report", value="cfo@logistics-saas.com")
+            if st.button("🚀 Trigger & Send Immediate Executive Report"):
+                df_rep = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
+                if send_automated_report(sched_email, df_rep):
+                    log_activity(st.session_state["username"], st.session_state["workspace"], "SEND_SCHEDULED_REPORT", sched_email)
+                    st.success("✅ Executive Report dispatched successfully via email!")
+                else:
+                    st.error("❌ Failed to send report. Please verify SMTP settings in Streamlit Secrets.")
+        else:
+            st.warning("Unauthorized: Only CFO or Admin roles can schedule or trigger automated reports.")
+
+    elif mode == "Vendor Risk Assessment":
+        st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
+        query = sqlalchemy.text("SELECT username, workspace, status, COUNT(*) as count FROM audits WHERE workspace = :w GROUP BY username, workspace, status")
+        df_vendor = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        if not df_vendor.empty:
+            st.dataframe(df_vendor, use_container_width=True)
+        else:
+            st.info("No vendor assessment data available yet.")
+
+    elif mode == lang["nav_tariff"]:
+        st.subheader("🏷️ AI Customs Tariff & HS Code Auto-Classifier")
+        item_desc = st.text_input("Enter Goods Description (e.g., 'MacBook Pro M3 Laptop', 'Industrial Hydraulic Pump')")
+        if st.button("Calculate Tariff & Classify"):
+            st.success("✅ HS Code Classified: **8471.30 (Portable Digital Automatic Data Processing Machines)**")
+            st.info("Estimated Customs Duty: **5%** | Import VAT: **16%** | Standard Compliance: **Verified**")
+
+    elif mode == lang["nav_erp"]:
+        st.subheader("🔌 ERP & Webhook Integrations")
+        webhook_url = st.text_input("Enterprise ERP Webhook Endpoint URL", value="https://api.yourcompany.com/erp/v1/webhooks/audit")
+        if st.button("🧪 Test Webhook & Sync Verified Audits"):
+            log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
+            st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
+
+render_active_view(app_mode)
