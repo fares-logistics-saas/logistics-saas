@@ -514,16 +514,22 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- UI Styling Theme (Smooth Fade-In Transition to eliminate visual pop) ---
+# --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
 st.markdown("""
     <style>
+    /* Lock root html and body background to eliminate white flashes on rerun */
+    html, body, [data-testid="stApp"], .stApp {
+        background-color: #030712 !important;
+        color: #f8fafc !important;
+    }
+    
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(4px); }
-        to { opacity: 1; transform: translateY(0); }
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
     
     [data-testid="stMain"] {
-        animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation: fadeIn 0.2s ease-in-out forwards;
     }
 
     [data-testid="InputInstructions"], 
@@ -541,7 +547,8 @@ st.markdown("""
         --secondary-background-color: #0f172a !important;
         --text-color: #f8fafc !important;
     }
-    .stApp, body, [data-testid="stViewToolbar"] {
+    
+    [data-testid="stViewToolbar"] {
         background-color: #030712 !important;
         color: #f8fafc !important;
     }
