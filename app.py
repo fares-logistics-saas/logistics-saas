@@ -168,15 +168,11 @@ PLAN_LIMITS = {
     "Enterprise": float('inf')
 }
 
-# 💰 --- REAL STRIPE API INTEGRATION --- 💰
-if "stripe" in st.secrets:
-    stripe.api_key = st.secrets["stripe"]["secret_key"]
-
+# 💰 --- ROBUST STRIPE API INTEGRATION --- 💰
 def create_stripe_checkout(plan_name, price_usd, current_username):
-    # If API keys are set, generate a real payment link
-    if "stripe" in st.secrets:
+    if "stripe" in st.secrets and "secret_key" in st.secrets["stripe"]:
         try:
-            # Assuming you are running on Streamlit Cloud, dynamically get the domain or set a default
+            stripe.api_key = st.secrets["stripe"]["secret_key"]
             app_url = "https://logistics-saas.streamlit.app"
             
             session = stripe.checkout.Session.create(
@@ -188,7 +184,7 @@ def create_stripe_checkout(plan_name, price_usd, current_username):
                             'name': f'Logistics SaaS - {plan_name} Tier',
                             'description': f'Automated Logistics Auditing - {plan_name} Plan',
                         },
-                        'unit_amount': int(price_usd * 100), # Stripe uses cents
+                        'unit_amount': int(price_usd * 100),
                     },
                     'quantity': 1,
                 }],
@@ -197,7 +193,7 @@ def create_stripe_checkout(plan_name, price_usd, current_username):
                 cancel_url=f"{app_url}/?payment_cancelled=true",
             )
             return session.url
-        except Exception as e:
+        except Exception:
             return None
     return None
 
@@ -372,7 +368,6 @@ if "payment_success" in query_params and query_params.get("payment_success") == 
         upgrade_tier(paid_user, paid_plan)
         st.success(f"🎉 Payment Successful! Account '{paid_user}' upgraded to {paid_plan} Tier.")
         st.balloons()
-        # Clear params to prevent looping
         st.query_params.clear()
 
 LANGUAGES = {
@@ -441,7 +436,6 @@ lang = LANGUAGES[selected_lang]
 # --- تصميم الثيم الساحق الزجاجي بالكامل (خالي من العيوب 100%) ---
 st.markdown("""
     <style>
-    /* 🔴🔴 إبادة جملة "Press Enter to submit form" نهائياً 🔴🔴 */
     [data-testid="InputInstructions"], 
     div[data-testid="stFormSubmitInstructions"],
     .st-emotion-cache-1kyxreq,
@@ -469,7 +463,6 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    /* 💎 توحيد جميع الأزرار لتكون نسخة طبق الأصل من زر Log out الزجاجي 💎 */
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
@@ -487,7 +480,6 @@ st.markdown("""
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
-    /* 💎 تأثير الإضاءة عند تمرير الماوس للأزرار 💎 */
     .stButton > button:hover, 
     [data-testid="collapsedControl"]:hover,
     [data-testid="stSidebarCollapseButton"]:hover,
@@ -500,7 +492,6 @@ st.markdown("""
         outline: none !important;
     }
 
-    /* 🔴 استثناء زر العين داخل الباسورد حتى لا يبدو كمربع كبير أزرق 🔴 */
     [data-baseweb="input"] button {
         background: transparent !important;
         border: none !important;
@@ -515,7 +506,6 @@ st.markdown("""
         fill: #93c5fd !important;
     }
 
-    /* 🔴 إزالة أي حدود حمراء من حقول الإدخال واستبدالها بالأزرق الزجاجي (Form & Inputs) 🔴 */
     [data-baseweb="input"], 
     [data-baseweb="base-input"], 
     [data-baseweb="select"] > div {
@@ -536,25 +526,21 @@ st.markdown("""
         outline: none !important;
     }
     
-    /* منع ظهور الخط الأحمر لأي عنصر عند التركيز عليه */
     *:focus {
         outline: none !important;
     }
 
-    /* إصلاح لون النص داخل القوائم والحقول ليكون أبيض واضحاً على الخلفية الزرقاء */
     input, select, textarea, div[data-baseweb="select"] span {
         background-color: transparent !important;
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
     }
     
-    /* تلوين السهم داخل القائمة المنسدلة باللون الأبيض */
     div[data-baseweb="select"] svg {
         fill: white !important;
         color: white !important;
     }
 
-    /* 💎 تثبيت زر القائمة الجانبية للأبد (Fixed and Always Visible) 💎 */
     header[data-testid="stHeader"] {
         background: transparent !important;
         opacity: 1 !important;
@@ -577,7 +563,6 @@ st.markdown("""
         color: white !important;
     }
 
-    /* تصميم دوائر الاختيار (Radio Buttons) لتناسب الثيم الزجاجي الأزرق */
     .stRadio [role="radiogroup"] [role="radio"] div:first-of-type,
     div[data-baseweb="radio"] > div {
         border-color: #60a5fa !important;
@@ -594,7 +579,6 @@ st.markdown("""
         background-color: #ffffff !important; 
     }
     
-    /* القائمة الجانبية بنمط الزجاج المصنفر الداكن */
     section[data-testid="stSidebar"] {
         background-color: rgba(10, 15, 30, 0.9) !important;
         backdrop-filter: blur(20px);
@@ -603,7 +587,6 @@ st.markdown("""
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
     
-    /* القوائم المنبثقة للـ Selectbox */
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #0f172a !important;
         border: 1px solid rgba(96, 165, 250, 0.4) !important;
@@ -893,12 +876,9 @@ elif app_mode == lang["nav_billing"]:
         if user_tier == "Pro":
             st.button("Current Plan", disabled=True, key="btn_pro_cur")
         else:
-            if "stripe" in st.secrets:
-                checkout_url = create_stripe_checkout("Pro", 150, st.session_state["username"])
-                if checkout_url:
-                    st.link_button("💳 Pay Securely with Stripe (Pro)", checkout_url)
-                else:
-                    st.error("Stripe configuration error.")
+            checkout_url = create_stripe_checkout("Pro", 150, st.session_state["username"])
+            if checkout_url:
+                st.link_button("💳 Pay Securely with Stripe (Pro)", checkout_url)
             else:
                 if st.button("💳 Upgrade to Pro (Simulation Mode)", key="btn_pro"):
                     upgrade_tier(st.session_state["username"], "Pro")
@@ -924,12 +904,9 @@ elif app_mode == lang["nav_billing"]:
         if user_tier == "Enterprise":
             st.button("Current Plan", disabled=True, key="btn_ent_cur")
         else:
-            if "stripe" in st.secrets:
-                checkout_url_ent = create_stripe_checkout("Enterprise", 500, st.session_state["username"])
-                if checkout_url_ent:
-                    st.link_button("💳 Pay Securely with Stripe (Enterprise)", checkout_url_ent)
-                else:
-                    st.error("Stripe configuration error.")
+            checkout_url_ent = create_stripe_checkout("Enterprise", 500, st.session_state["username"])
+            if checkout_url_ent:
+                st.link_button("💳 Pay Securely with Stripe (Enterprise)", checkout_url_ent)
             else:
                 if st.button("💳 Upgrade to Enterprise (Simulation)", key="btn_ent"):
                     upgrade_tier(st.session_state["username"], "Enterprise")
