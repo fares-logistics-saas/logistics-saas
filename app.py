@@ -68,50 +68,54 @@ def has_permission(role, action):
 
 # --- Initialize Enterprise Database Tables ---
 def init_db():
-    with engine.begin() as conn:
-        conn.execute(sqlalchemy.text("""
-            CREATE TABLE IF NOT EXISTS audits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                filename TEXT,
-                tracking_id TEXT,
-                container_no TEXT,
-                port TEXT,
-                hs_code TEXT,
-                stamp_status TEXT,
-                iot_status TEXT DEFAULT 'GPS Active (On Schedule)',
-                cfo_approval TEXT DEFAULT 'Pending CFO Sign-off',
-                date TEXT,
-                currency TEXT,
-                status TEXT,
-                review_status TEXT DEFAULT 'Pending Review',
-                audit_hash TEXT,
-                workspace TEXT,
-                username TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """))
-        conn.execute(sqlalchemy.text("""
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password TEXT,
-                role TEXT,
-                workspace TEXT DEFAULT 'Default Corp',
-                mfa_code TEXT DEFAULT '1234',
-                subscription_tier TEXT DEFAULT 'Free',
-                invoices_processed INTEGER DEFAULT 0
-            )
-        """))
-        conn.execute(sqlalchemy.text("""
-            CREATE TABLE IF NOT EXISTS activity_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT,
-                workspace TEXT,
-                action TEXT,
-                target_id TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """))
+    try:
+        with engine.begin() as conn:
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS audits (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT,
+                    tracking_id TEXT,
+                    container_no TEXT,
+                    port TEXT,
+                    hs_code TEXT,
+                    stamp_status TEXT,
+                    iot_status TEXT DEFAULT 'GPS Active (On Schedule)',
+                    cfo_approval TEXT DEFAULT 'Pending CFO Sign-off',
+                    date TEXT,
+                    currency TEXT,
+                    status TEXT,
+                    review_status TEXT DEFAULT 'Pending Review',
+                    audit_hash TEXT,
+                    workspace TEXT,
+                    username TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    username TEXT PRIMARY KEY,
+                    password TEXT,
+                    role TEXT,
+                    workspace TEXT DEFAULT 'Default Corp',
+                    mfa_code TEXT DEFAULT '1234',
+                    subscription_tier TEXT DEFAULT 'Free',
+                    invoices_processed INTEGER DEFAULT 0
+                )
+            """))
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT,
+                    workspace TEXT,
+                    action TEXT,
+                    target_id TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+    except Exception:
+        pass
 
+    # محاولات آمنة لإضافة أي أعمدة ناقصة
     migrations = [
         "ALTER TABLE users ADD COLUMN workspace TEXT DEFAULT 'Default Corp'",
         "ALTER TABLE users ADD COLUMN mfa_code TEXT DEFAULT '1234'",
@@ -132,12 +136,15 @@ def init_db():
         except Exception:
             pass
 
-    with engine.begin() as conn:
-        result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
-        if not result:
-            hashed_pwd = make_hashes("password123")
-            conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role, workspace, mfa_code, subscription_tier) VALUES (:u, :p, :r, :w, :m, :s)"),
-                         {"u": "admin", "p": hashed_pwd, "r": "Admin", "w": "Global Logistics Hub", "m": "1234", "s": "Enterprise"})
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
+            if not result:
+                hashed_pwd = make_hashes("password123")
+                conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role, workspace, mfa_code, subscription_tier) VALUES (:u, :p, :r, :w, :m, :s)"),
+                             {"u": "admin", "p": hashed_pwd, "r": "Admin", "w": "Global Logistics Hub", "m": "1234", "s": "Enterprise"})
+    except Exception:
+        pass
 
 init_db()
 
