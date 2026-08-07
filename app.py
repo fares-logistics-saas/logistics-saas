@@ -392,9 +392,19 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق: توحيد 100% لتصميم الـ Log out لجميع العناصر، وتثبيت زر التراجع للأبد ---
+# --- تصميم الثيم الساحق: إزالة كلمة Form وإلغاء أي لون أحمر للأبد، وتوحيد الأزرار الزجاجية ---
 st.markdown("""
     <style>
+    /* 🔴🔴 إبادة جملة "Press Enter to submit form" نهائياً 🔴🔴 */
+    [data-testid="InputInstructions"], 
+    div[data-testid="stFormSubmitInstructions"],
+    .st-emotion-cache-1kyxreq,
+    small {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+
     :root {
         --primary-color: #2563eb !important;
         --background-color: #030712 !important;
@@ -413,18 +423,14 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    /* 🔴 الجوهر: جعل جميع الأزرار، القوائم المنسدلة، وحقول الإدخال متطابقة 100% مع زر Log out 🔴 */
+    /* 💎 توحيد جميع الأزرار لتكون نسخة طبق الأصل من زر Log out الزجاجي 💎 */
     .stButton > button, 
-    button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
-    .stSelectbox div[data-baseweb="select"] > div,
-    .stTextInput div[data-baseweb="base-input"],
-    .stNumberInput div[data-baseweb="base-input"],
-    .stPassword div[data-baseweb="base-input"],
     [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapseButton"],
-    button[kind="header"] {
+    button[kind="header"],
+    [data-testid="stFileUploader"] button {
         border-radius: 12px !important;
         font-weight: 700 !important;
         background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%) !important;
@@ -435,21 +441,57 @@ st.markdown("""
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
-    /* تأثير التحويم (Hover) لجميع العناصر لتكون مضيئة مثل الـ Log out */
+    /* 💎 تأثير الإضاءة عند تمرير الماوس للأزرار 💎 */
     .stButton > button:hover, 
-    button:hover, 
-    .stSelectbox div[data-baseweb="select"] > div:hover,
-    .stSelectbox div[data-baseweb="select"] > div:focus-within,
-    .stTextInput div[data-baseweb="base-input"]:hover,
-    .stTextInput div[data-baseweb="base-input"]:focus-within,
-    .stNumberInput div[data-baseweb="base-input"]:hover,
     [data-testid="collapsedControl"]:hover,
     [data-testid="stSidebarCollapseButton"]:hover,
-    button[kind="header"]:hover {
+    button[kind="header"]:hover,
+    [data-testid="stFileUploader"] button:hover {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
         box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
         border-color: #93c5fd !important;
         transform: translateY(-1px) !important;
+        outline: none !important;
+    }
+
+    /* 🔴 استثناء زر العين داخل الباسورد حتى لا يبدو كمربع كبير أزرق 🔴 */
+    [data-baseweb="input"] button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    [data-baseweb="input"] button:hover {
+        background: transparent !important;
+        transform: scale(1.1) !important;
+        box-shadow: none !important;
+    }
+    [data-baseweb="input"] button svg {
+        fill: #93c5fd !important;
+    }
+
+    /* 🔴 إزالة أي حدود حمراء من حقول الإدخال واستبدالها بالأزرق الزجاجي (Form & Inputs) 🔴 */
+    [data-baseweb="input"], 
+    [data-baseweb="base-input"], 
+    [data-baseweb="select"] > div {
+        border-color: rgba(147, 197, 253, 0.5) !important;
+        border-radius: 12px !important;
+        background-color: rgba(15, 23, 42, 0.7) !important;
+        outline: none !important;
+    }
+    
+    [data-baseweb="input"]:focus-within, 
+    [data-baseweb="base-input"]:focus-within, 
+    [data-baseweb="select"] > div:focus-within,
+    [data-baseweb="input"]:hover, 
+    [data-baseweb="base-input"]:hover, 
+    [data-baseweb="select"] > div:hover {
+        border-color: #60a5fa !important;
+        box-shadow: 0 0 20px rgba(96, 165, 250, 0.6) !important;
+        outline: none !important;
+    }
+    
+    /* منع ظهور الخط الأحمر لأي عنصر عند التركيز عليه */
+    *:focus {
         outline: none !important;
     }
 
@@ -466,7 +508,7 @@ st.markdown("""
         color: white !important;
     }
 
-    /* 🔴 تثبيت الهيدر وزر القائمة الجانبية للأبد (Fixed and Always Visible) 🔴 */
+    /* 💎 تثبيت زر القائمة الجانبية للأبد (Fixed and Always Visible) 💎 */
     header[data-testid="stHeader"] {
         background: transparent !important;
         opacity: 1 !important;
@@ -474,7 +516,6 @@ st.markdown("""
         z-index: 99999 !important;
     }
     
-    /* زر فتح وإغلاق القائمة الجانبية (تم تثبيته في الزاوية اليسرى العليا، مرئي دائماً، وبتصميم Log out) */
     [data-testid="collapsedControl"] {
         display: flex !important;
         opacity: 1 !important;
