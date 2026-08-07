@@ -539,7 +539,7 @@ LANGUAGES = {
     }
 }
 
-# --- اللوجو الشفاف المتمركز وفي سطر واحد مع تأثير التفاعل (Hover) ---
+# --- اللوجو الشفاف المتمركز مع أيقونة أكبر قليلاً ومرفوعة للأعلى ---
 logo_svg = """
 <div class="custom-logo-container">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70" width="100%" height="100%">
@@ -554,8 +554,8 @@ logo_svg = """
     </linearGradient>
   </defs>
 
-  <!-- Centered Icon -->
-  <g transform="translate(130, 2) scale(0.45)">
+  <!-- Centered Larger Icon, Moved Up -->
+  <g transform="translate(127, -4) scale(0.55)">
     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -565,7 +565,7 @@ logo_svg = """
   </g>
 
   <!-- Centered Single Line Text -->
-  <text x="150" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="10" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+  <text x="150" y="58" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 """
