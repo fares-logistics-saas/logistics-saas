@@ -8,6 +8,8 @@ import requests
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from PIL import Image
 import pypdf
 import pytesseract
@@ -24,11 +26,9 @@ import openai
 import plotly.express as px
 import stripe
 
-# Automatic path detection for Windows vs Cloud (Linux)
+# --- Automatic Path Detection ---
 if platform.system() == "Windows":
-    pytesseract.pytesseract.tesseract_cmd = (
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    )
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     POPPLER_PATH = r"C:\poppler\Library\bin"
 else:
     pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
@@ -37,7 +37,7 @@ else:
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Database Engine Configuration (Cloud PostgreSQL & Local SQLite Fallback) ---
+# --- Database Engine Configuration ---
 DB_URL = "sqlite:///logistics_audits.db"
 if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
     secret_url = st.secrets["postgres"]["url"]
@@ -46,7 +46,20 @@ if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
 
 engine = sqlalchemy.create_engine(DB_URL)
 
-# --- Initialize Database Tables & Safe Migrations ---
+# --- RBAC Permissions Matrix ---
+PERMISSIONS = {
+    "Admin": ["all"],
+    "CFO": ["view_reports", "approve_cfo", "view_history", "analytics", "schedule_reports"],
+    "Auditor": ["process", "view_history", "iot", "tariff"],
+    "Viewer": ["view_history", "analytics"]
+}
+
+def has_permission(role, action):
+    if role not in PERMISSIONS: 
+        return False
+    return "all" in PERMISSIONS[role] or action in PERMISSIONS[role]
+
+# --- Initialize Enterprise Database Tables & Activity Logs ---
 def init_db():
     with engine.begin() as conn:
         if "sqlite" in DB_URL:
@@ -82,6 +95,16 @@ def init_db():
                     invoices_processed INTEGER DEFAULT 0
                 )
             """))
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT,
+                    workspace TEXT,
+                    action TEXT,
+                    target_id TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
         else:
             conn.execute(sqlalchemy.text("""
                 CREATE TABLE IF NOT EXISTS audits (
@@ -115,6 +138,16 @@ def init_db():
                     invoices_processed INTEGER DEFAULT 0
                 )
             """))
+            conn.execute(sqlalchemy.text("""
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT,
+                    workspace TEXT,
+                    action TEXT,
+                    target_id TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
 
     migrations = [
         "ALTER TABLE users ADD COLUMN workspace TEXT DEFAULT 'Default Corp'",
@@ -146,7 +179,14 @@ def init_db():
 
 init_db()
 
-# --- Subscription & Billing Management Logic ---
+def log_activity(username, workspace, action, target_id="N/A"):
+    with engine.begin() as conn:
+        conn.execute(sqlalchemy.text("""
+            INSERT INTO activity_logs (username, workspace, action, target_id)
+            VALUES (:u, :w, :a, :t)
+        """), {"u": username, "w": workspace, "a": action, "t": str(target_id)})
+
+# --- Subscription & Billing Management ---
 def get_user_sub_info(username):
     with engine.connect() as conn:
         result = conn.execute(sqlalchemy.text("SELECT subscription_tier, invoices_processed FROM users WHERE username = :u"), {"u": username}).fetchone()
@@ -168,7 +208,6 @@ PLAN_LIMITS = {
     "Enterprise": float('inf')
 }
 
-# 💰 --- STRIPE API INTEGRATION --- 💰
 def create_stripe_checkout(plan_name, price_usd, current_username):
     if "stripe" in st.secrets and "secret_key" in st.secrets["stripe"]:
         try:
@@ -197,7 +236,6 @@ def create_stripe_checkout(plan_name, price_usd, current_username):
             return None
     return None
 
-# --- Automated SMTP Email Dispatcher ---
 def send_email_alert(recipient_email, filename, audit_status, container_no):
     if "email" in st.secrets:
         try:
@@ -234,7 +272,32 @@ def send_email_alert(recipient_email, filename, audit_status, container_no):
             return False
     return False
 
-# --- Live Carrier API Integration (DHL / Aramex) ---
+def send_automated_report(recipient_email, df):
+    pdf_buffer = generate_executive_pdf(df, "Automated Weekly Executive Report")
+    if "email" in st.secrets:
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = st.secrets["email"]["sender_email"]
+            msg['To'] = recipient_email
+            msg['Subject'] = "📊 Logistics SaaS: Automated Executive Report"
+            msg.attach(MIMEText("Please find attached your weekly logistics audit report.", 'plain'))
+            
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(pdf_buffer.getvalue())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', "attachment; filename=executive_report.pdf")
+            msg.attach(part)
+            
+            server = smtplib.SMTP(st.secrets["email"]["smtp_server"], int(st.secrets["email"]["smtp_port"]))
+            server.starttls()
+            server.login(st.secrets["email"]["sender_email"], st.secrets["email"]["sender_password"])
+            server.send_message(msg)
+            server.quit()
+            return True
+        except Exception:
+            return False
+    return False
+
 def fetch_live_carrier_tracking(tracking_id, carrier="DHL"):
     if "carrier_api" in st.secrets and carrier.lower() in st.secrets["carrier_api"]:
         try:
@@ -291,6 +354,7 @@ def save_to_db(record, username, workspace):
             "w": workspace,
             "u": username
         })
+    log_activity(username, workspace, "SAVE_AUDIT_RECORD", record["Filename"])
     st.cache_data.clear()
 
 def generate_executive_pdf(df, title_text):
@@ -393,6 +457,7 @@ LANGUAGES = {
         "nav_history": "Audit Database History",
         "nav_kpi": "Analytics, KPIs & AI Forecasting",
         "nav_alerts": "Automated Alerts & Notifications",
+        "nav_scheduler": "Automated Email Scheduler",
         
         "nav_voice": "AI Voice & Text Assistant",
         "nav_vendor": "Vendor Risk Assessment",
@@ -422,6 +487,7 @@ LANGUAGES = {
         "nav_history": "سجلات قاعدة البيانات التدقيقية",
         "nav_kpi": "لوحة التحليلات والتنبؤ المالي (KPIs)",
         "nav_alerts": "مركز التنبيهات الآلية",
+        "nav_scheduler": "جدولة وتنزيل التقارير الآلية",
         
         "nav_voice": "المساعد الصوتي والتحليلي الذكي",
         "nav_vendor": "تقييم مخاطر الموردين",
@@ -434,7 +500,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق: فصل أزرار (+ و -) ومنع تداخل الحدود لتكون أزرار منفصلة وزجاجية بالكامل ---
+# --- تصميم الثيم الساحق: إبادة تامة للحدود وجعل كل العناصر والزرار زجاجية وموحدة ---
 st.markdown("""
     <style>
     [data-testid="InputInstructions"], 
@@ -464,7 +530,6 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    /* توحيد الأزرار العامة */
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
@@ -477,18 +542,17 @@ st.markdown("""
         background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%) !important;
         backdrop-filter: blur(10px) !important;
         color: white !important;
-        border: 1px solid rgba(147, 197, 253, 0.5) !important;
+        border: none !important;
         box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
-    /* إصلاح جذري لأزرار الـ (+ و -) في حقول الأرقام لتقسيمها وتجنب أي تداخل حدود */
     .stNumberInput button, div[data-baseweb="spinbutton"] button {
         border-radius: 8px !important;
         font-weight: 700 !important;
         background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(29, 78, 216, 1) 100%) !important;
         color: white !important;
-        border: 1px solid rgba(147, 197, 253, 0.6) !important;
+        border: none !important;
         margin: 0 3px !important;
         box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
     }
@@ -501,7 +565,6 @@ st.markdown("""
     .stNumberInput button:hover, div[data-baseweb="spinbutton"] button:hover {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
         box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-        border-color: #93c5fd !important;
         transform: translateY(-1px) !important;
         outline: none !important;
     }
@@ -523,7 +586,7 @@ st.markdown("""
     [data-baseweb="input"], 
     [data-baseweb="base-input"], 
     [data-baseweb="select"] > div {
-        border-color: rgba(147, 197, 253, 0.5) !important;
+        border: none !important;
         border-radius: 12px !important;
         background-color: rgba(15, 23, 42, 0.7) !important;
         outline: none !important;
@@ -535,7 +598,6 @@ st.markdown("""
     [data-baseweb="input"]:hover, 
     [data-baseweb="base-input"]:hover, 
     [data-baseweb="select"] > div:hover {
-        border-color: #60a5fa !important;
         box-shadow: 0 0 20px rgba(96, 165, 250, 0.6) !important;
         outline: none !important;
     }
@@ -579,13 +641,12 @@ st.markdown("""
 
     .stRadio [role="radiogroup"] [role="radio"] div:first-of-type,
     div[data-baseweb="radio"] > div {
-        border-color: #60a5fa !important;
+        border: none !important;
         background-color: rgba(37, 99, 235, 0.3) !important;
     }
     .stRadio [role="radiogroup"] [role="radio"][aria-checked="true"] div:first-of-type,
     div[data-baseweb="radio"] input:checked + div {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        border-color: #ffffff !important;
         box-shadow: 0 0 15px rgba(59, 130, 246, 0.9) !important;
     }
     
@@ -593,13 +654,13 @@ st.markdown("""
         background-color: rgba(10, 15, 30, 0.9) !important;
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border-right: 1px solid rgba(59, 130, 246, 0.25);
+        border-right: none !important;
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
     
     div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
         background-color: #0f172a !important;
-        border: 1px solid rgba(96, 165, 250, 0.4) !important;
+        border: none !important;
         border-radius: 12px !important;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8) !important;
     }
@@ -640,6 +701,7 @@ if not st.session_state["logged_in"]:
                         st.session_state["username"] = l_user.strip()
                         st.session_state["role"] = role
                         st.session_state["workspace"] = workspace
+                        log_activity(l_user.strip(), workspace, "USER_LOGIN")
                         st.toast(f"Welcome back, {l_user}!", icon="👋")
                         time.sleep(1)
                         st.rerun()
@@ -662,6 +724,7 @@ if not st.session_state["logged_in"]:
                 if r_user and r_pass and r_workspace:
                     success = add_user(r_user.strip(), r_pass, r_role, r_workspace.strip(), r_mfa.strip())
                     if success:
+                        log_activity(r_user.strip(), r_workspace.strip(), "USER_REGISTER")
                         st.toast("Free Account created successfully! Switch to Login.", icon="✅")
                     else:
                         st.error("Username already exists.")
@@ -675,6 +738,7 @@ st.sidebar.write(f"👤 User: **{st.session_state['username']}**")
 st.sidebar.write(f"🏢 Workspace: **{st.session_state['workspace']}**")
 st.sidebar.write(f"💎 Plan: **{user_tier}** ({invoices_processed}/{PLAN_LIMITS[user_tier]} used)")
 if st.sidebar.button("Log out"):
+    log_activity(st.session_state["username"], st.session_state["workspace"], "USER_LOGOUT")
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
     st.rerun()
@@ -696,7 +760,7 @@ if category_choice == lang["cat_ops"]:
 elif category_choice == lang["cat_fin"]:
     app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]])
 elif category_choice == lang["cat_rep"]:
-    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"]])
+    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]])
 else:
     app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]])
 
@@ -851,7 +915,7 @@ elif app_mode == lang["nav_billing"]:
     
     with col1:
         st.markdown("""
-        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #3b82f6; text-align: center;">
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
             <h2 style="color: white;">Free Tier</h2>
             <h1 style="color: #60a5fa;">$0<span style="font-size: 14px; color: gray;">/mo</span></h1>
             <p>Perfect for testing.</p>
@@ -869,7 +933,7 @@ elif app_mode == lang["nav_billing"]:
             
     with col2:
         st.markdown("""
-        <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; border: 2px solid #60a5fa; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
+        <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
             <h2 style="color: white;">Pro Tier 🚀</h2>
             <h1 style="color: #60a5fa;">$150<span style="font-size: 14px; color: gray;">/mo</span></h1>
             <p>For growing logistics firms.</p>
@@ -891,13 +955,14 @@ elif app_mode == lang["nav_billing"]:
             else:
                 if st.button("💳 Upgrade to Pro (Simulation Mode)", key="btn_pro"):
                     upgrade_tier(st.session_state["username"], "Pro")
+                    log_activity(st.session_state["username"], st.session_state["workspace"], "UPGRADE_PLAN", "Pro")
                     st.toast("Upgraded to Pro Successfully via Simulated Checkout!", icon="💸")
                     time.sleep(1)
                     st.rerun()
 
     with col3:
         st.markdown("""
-        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #3b82f6; text-align: center;">
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
             <h2 style="color: white;">Enterprise</h2>
             <h1 style="color: #60a5fa;">$500<span style="font-size: 14px; color: gray;">/mo</span></h1>
             <p>For global shipping hubs.</p>
@@ -919,6 +984,7 @@ elif app_mode == lang["nav_billing"]:
             else:
                 if st.button("💳 Upgrade to Enterprise (Simulation)", key="btn_ent"):
                     upgrade_tier(st.session_state["username"], "Enterprise")
+                    log_activity(st.session_state["username"], st.session_state["workspace"], "UPGRADE_PLAN", "Enterprise")
                     st.toast("Upgraded to Enterprise Successfully via Simulated Checkout!", icon="💸")
                     time.sleep(1)
                     st.rerun()
@@ -941,6 +1007,7 @@ elif app_mode == lang["nav_review"]:
                 if st.button(f"Verify & Commit Record #{row['id']}", key=f"btn_{row['id']}"):
                     with engine.begin() as conn:
                         conn.execute(sqlalchemy.text("UPDATE audits SET tracking_id = :t, container_no = :c, port = :p, status = :s, review_status = 'Verified' WHERE id = :id"), {"t": new_track, "c": new_cont, "p": new_port, "s": new_status, "id": row['id']})
+                    log_activity(st.session_state["username"], st.session_state["workspace"], "VERIFY_RECORD", row['id'])
                     st.cache_data.clear()
                     st.toast(f"Record #{row['id']} verified!", icon="💾")
                     time.sleep(0.5)
@@ -975,20 +1042,24 @@ elif app_mode == lang["nav_iot"]:
 
 elif app_mode == lang["nav_workflow"]:
     st.subheader("👔 Multi-Tier CFO Approval Workflow")
-    query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved'")
-    df_cfo = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-    if not df_cfo.empty:
-        for _, row in df_cfo.iterrows():
-            st.markdown(f"**Container:** {row['container_no']} | **Status:** {row['status']} | **CFO Status:** {row['cfo_approval']}")
-            if st.button(f"✍️ CFO Digital Sign & Approve #{row['id']}", key=f"cfo_{row['id']}"):
-                with engine.begin() as conn:
-                    conn.execute(sqlalchemy.text("UPDATE audits SET cfo_approval = 'Approved by CFO' WHERE id = :id"), {"id": row['id']})
-                st.cache_data.clear()
-                st.toast(f"Discrepancy #{row['id']} approved by CFO!", icon="✍️")
-                time.sleep(0.5)
-                st.rerun()
+    if has_permission(st.session_state["role"], "approve_cfo"):
+        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved'")
+        df_cfo = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        if not df_cfo.empty:
+            for _, row in df_cfo.iterrows():
+                st.markdown(f"**Container:** {row['container_no']} | **Status:** {row['status']} | **CFO Status:** {row['cfo_approval']}")
+                if st.button(f"✍️ CFO Digital Sign & Approve #{row['id']}", key=f"cfo_{row['id']}"):
+                    with engine.begin() as conn:
+                        conn.execute(sqlalchemy.text("UPDATE audits SET cfo_approval = 'Approved by CFO' WHERE id = :id"), {"id": row['id']})
+                    log_activity(st.session_state["username"], st.session_state["workspace"], "CFO_APPROVE", row['id'])
+                    st.cache_data.clear()
+                    st.toast(f"Discrepancy #{row['id']} approved by CFO!", icon="✍️")
+                    time.sleep(0.5)
+                    st.rerun()
+        else:
+            st.success("🎉 No high-value discrepancies pending CFO approval.")
     else:
-        st.success("🎉 No high-value discrepancies pending CFO approval.")
+        st.warning("Unauthorized: Only CFO or Admin roles can access the approval workflow.")
 
 elif app_mode == lang["nav_voice"]:
     st.subheader("🎙️ AI Voice & Text Audit Assistant")
@@ -1051,6 +1122,21 @@ elif app_mode == lang["nav_alerts"]:
     else:
         st.success("🎉 Outstanding! No discrepancy alerts found.")
 
+elif app_mode == lang["nav_scheduler"]:
+    st.subheader("📅 Automated Report Scheduler & Dispatcher")
+    if has_permission(st.session_state["role"], "schedule_reports"):
+        sched_email = st.text_input("Recipient Email for Scheduled Report", value="cfo@logistics-saas.com")
+        if st.button("🚀 Trigger & Send Immediate Executive Report"):
+            with st.spinner("Compiling PDF and dispatching email..."):
+                df_rep = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
+                if send_automated_report(sched_email, df_rep):
+                    log_activity(st.session_state["username"], st.session_state["workspace"], "SEND_SCHEDULED_REPORT", sched_email)
+                    st.success("✅ Executive Report dispatched successfully via email!")
+                else:
+                    st.error("❌ Failed to send report. Please verify SMTP settings in Streamlit Secrets.")
+    else:
+        st.warning("Unauthorized: Only CFO or Admin roles can schedule or trigger automated reports.")
+
 elif app_mode == "Vendor Risk Assessment":
     st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
     query = sqlalchemy.text("SELECT username, workspace, status, COUNT(*) as count FROM audits WHERE workspace = :w GROUP BY username, workspace, status")
@@ -1075,4 +1161,5 @@ elif app_mode == lang["nav_erp"]:
     if st.button("🧪 Test Webhook & Sync Verified Audits"):
         with st.spinner("Syncing to ERP..."):
             time.sleep(1)
+            log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
             st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
