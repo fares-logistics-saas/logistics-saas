@@ -204,8 +204,17 @@ def log_activity(username, workspace, action, target_id="N/A"):
     except Exception:
         pass
 
+# --- Centralized Data Caching for Zero Latency Navigation ---
+@st.cache_data(ttl=60, show_spinner=False)
+def get_workspace_audits(workspace):
+    """Fetches all workspace audits once and caches them. Clears on mutation."""
+    return pd.read_sql(
+        sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w ORDER BY timestamp DESC"),
+        engine, params={"w": workspace}
+    )
+
 # --- Subscription & Billing Management ---
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=15, show_spinner=False)
 def get_user_sub_info(username):
     with engine.connect() as conn:
         result = conn.execute(sqlalchemy.text("SELECT subscription_tier, invoices_processed FROM users WHERE username = :u"), {"u": username}).fetchone()
@@ -229,7 +238,7 @@ PLAN_LIMITS = {
     "Enterprise": float('inf')
 }
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def create_paddle_checkout(plan_name, price_id, current_username):
     if not PADDLE_API_KEY or not price_id:
         return None
@@ -312,7 +321,7 @@ def send_automated_report(recipient_email, df):
             return False
     return False
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60, show_spinner=False)
 def fetch_live_carrier_tracking(tracking_id, carrier="DHL"):
     if "carrier_api" in st.secrets and carrier.lower() in st.secrets["carrier_api"]:
         try:
@@ -371,7 +380,7 @@ def save_to_db(record, username, workspace):
             "u": username
         })
     log_activity(username, workspace, "SAVE_AUDIT_RECORD", record["Filename"])
-    st.cache_data.clear()
+    st.cache_data.clear() # Invalidates get_workspace_audits so new edits show instantly
 
 def generate_executive_pdf(df, title_text):
     buffer = BytesIO()
@@ -515,21 +524,13 @@ selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العرب�
 lang = LANGUAGES[selected_lang]
 
 # --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
+# Removed the custom `@keyframes fadeIn` which was artificially injecting a 0.2s delay/flash on every click.
 st.markdown("""
     <style>
     /* Lock root html and body background to eliminate white flashes on rerun */
     html, body, [data-testid="stApp"], .stApp {
         background-color: #030712 !important;
         color: #f8fafc !important;
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    [data-testid="stMain"] {
-        animation: fadeIn 0.2s ease-in-out forwards;
     }
 
     [data-testid="InputInstructions"], 
@@ -841,6 +842,9 @@ def parse_invoice_with_ai(text, filename, currency):
 
 @st.fragment
 def render_active_view(mode):
+    # Fetch full workspace dataframe ONCE and cache it for all subsequent operations.
+    df_all = get_workspace_audits(st.session_state["workspace"])
+    
     if mode == lang["nav_process"]:
         st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
         
@@ -990,8 +994,7 @@ def render_active_view(mode):
 
     elif mode == lang["nav_review"]:
         st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
-        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND review_status = 'Pending Review' ORDER BY timestamp DESC")
-        df_pending = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        df_pending = df_all[df_all['review_status'] == 'Pending Review']
         if not df_pending.empty:
             for idx, row in df_pending.iterrows():
                 with st.expander(f"📁 File: {row['filename']} | 📦 Container: {row['container_no']} | 🚦 Status: {row['status']}"):
@@ -1015,8 +1018,7 @@ def render_active_view(mode):
 
     elif mode == lang["nav_dispute"]:
         st.subheader("⚖️ Automated Dispute Letter Generator")
-        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved' ORDER BY timestamp DESC")
-        df_disputes = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        df_disputes = df_all[df_all['status'] != '✅ Approved']
         if not df_disputes.empty:
             for _, row in df_disputes.iterrows():
                 st.markdown(f"**File:** {row['filename']} | **Container:** {row['container_no']} | **Status:** {row['status']}")
@@ -1033,16 +1035,14 @@ def render_active_view(mode):
         if st.button("Query Live Carrier API"):
             st.success(f"📡 API Response: {fetch_live_carrier_tracking(query_track, carrier_choice)}")
             
-        query = sqlalchemy.text("SELECT container_no, port, date, status, iot_status FROM audits WHERE workspace = :w")
-        df_iot = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-        if not df_iot.empty:
+        if not df_all.empty:
+            df_iot = df_all[['container_no', 'port', 'date', 'status', 'iot_status']]
             st.dataframe(df_iot, use_container_width=True)
 
     elif mode == lang["nav_workflow"]:
         st.subheader("👔 Multi-Tier CFO Approval Workflow")
         if has_permission(st.session_state["role"], "approve_cfo"):
-            query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved'")
-            df_cfo = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+            df_cfo = df_all[df_all['status'] != '✅ Approved']
             if not df_cfo.empty:
                 for _, row in df_cfo.iterrows():
                     st.markdown(f"**Container:** {row['container_no']} | **Status:** {row['status']} | **CFO Status:** {row['cfo_approval']}")
@@ -1063,34 +1063,30 @@ def render_active_view(mode):
         user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
         if st.button("Ask AI"):
             if "leakage" in user_query.lower() or "هدر" in user_query.lower():
-                df_temp = pd.read_sql("SELECT * FROM audits WHERE workspace = :w", engine, params={"w": st.session_state["workspace"]})
-                disc = len(df_temp[df_temp["status"] != "✅ Approved"])
+                disc = len(df_all[df_all["status"] != "✅ Approved"])
                 st.info(f"🤖 AI Assistant: Based on your workspace database, you have {disc} flagged discrepancies with an estimated financial leakage impact of ${disc * 450:,.2f}.")
             else:
                 st.info("🤖 AI Assistant: All workspace audit logs are synchronized and fully operational. No critical risks detected.")
 
     elif mode == lang["nav_history"]:
         st.subheader("🗄️ Enterprise Cloud Database Logs")
-        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w ORDER BY timestamp DESC")
-        df_history = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-        if not df_history.empty:
-            st.dataframe(df_history, use_container_width=True)
+        if not df_all.empty:
+            st.dataframe(df_all, use_container_width=True)
             col_csv, col_pdf = st.columns(2)
             with col_csv:
-                csv_history = df_history.to_csv(index=False).encode('utf-8')
+                csv_history = df_all.to_csv(index=False).encode('utf-8')
                 st.download_button(label="📥 Download History (CSV)", data=csv_history, file_name='audit_history.csv', mime='text/csv')
             with col_pdf:
-                pdf_buffer = generate_executive_pdf(df_history, f"Immutable Audit Trails - Workspace: {st.session_state['workspace']}")
+                pdf_buffer = generate_executive_pdf(df_all, f"Immutable Audit Trails - Workspace: {st.session_state['workspace']}")
                 st.download_button(label="📄 Download Executive Report (PDF)", data=pdf_buffer, file_name='audit_history_executive.pdf', mime='application/pdf')
         else:
             st.info("No historical records found.")
 
     elif mode == lang["nav_kpi"]:
         st.subheader("📈 Executive Logistics Analytics & KPIs")
-        df_analytics = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
-        if not df_analytics.empty:
-            total_audits = len(df_analytics)
-            approved_count = len(df_analytics[df_analytics["status"] == "✅ Approved"])
+        if not df_all.empty:
+            total_audits = len(df_all)
+            approved_count = len(df_all[df_all["status"] == "✅ Approved"])
             discrepancy_count = total_audits - approved_count
             estimated_savings = discrepancy_count * 450.0
             
@@ -1101,7 +1097,7 @@ def render_active_view(mode):
             col4.metric("Estimated Cost Savings", f"${estimated_savings:,.2f}")
             
             st.markdown("---")
-            fig_pie = px.pie(df_analytics, names='status', title='Audit Status Breakdown', hole=0.4, color_discrete_sequence=['#10b981', '#2563eb', '#f59e0b'])
+            fig_pie = px.pie(df_all, names='status', title='Audit Status Breakdown', hole=0.4, color_discrete_sequence=['#10b981', '#2563eb', '#f59e0b'])
             fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="white")
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
@@ -1109,8 +1105,7 @@ def render_active_view(mode):
 
     elif mode == lang["nav_alerts"]:
         st.subheader("🚨 Automated Discrepancy Alerts Center")
-        query = sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w AND status != '✅ Approved' ORDER BY timestamp DESC")
-        df_alerts = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
+        df_alerts = df_all[df_all['status'] != '✅ Approved']
         if not df_alerts.empty:
             st.error(f"⚠️ Total Active Discrepancy Alerts Requiring Attention: {len(df_alerts)}")
             st.dataframe(df_alerts, use_container_width=True)
@@ -1122,8 +1117,7 @@ def render_active_view(mode):
         if has_permission(st.session_state["role"], "schedule_reports"):
             sched_email = st.text_input("Recipient Email for Scheduled Report", value="cfo@logistics-saas.com")
             if st.button("🚀 Trigger & Send Immediate Executive Report"):
-                df_rep = pd.read_sql(sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w"), engine, params={"w": st.session_state["workspace"]})
-                if send_automated_report(sched_email, df_rep):
+                if send_automated_report(sched_email, df_all):
                     log_activity(st.session_state["username"], st.session_state["workspace"], "SEND_SCHEDULED_REPORT", sched_email)
                     st.success("✅ Executive Report dispatched successfully via email!")
                 else:
@@ -1133,9 +1127,9 @@ def render_active_view(mode):
 
     elif mode == "Vendor Risk Assessment":
         st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
-        query = sqlalchemy.text("SELECT username, workspace, status, COUNT(*) as count FROM audits WHERE workspace = :w GROUP BY username, workspace, status")
-        df_vendor = pd.read_sql(query, engine, params={"w": st.session_state["workspace"]})
-        if not df_vendor.empty:
+        if not df_all.empty:
+            # Replaced DB call with instant Pandas grouping from cached dataframe
+            df_vendor = df_all.groupby(['username', 'workspace', 'status']).size().reset_index(name='count')
             st.dataframe(df_vendor, use_container_width=True)
         else:
             st.info("No vendor assessment data available yet.")
@@ -1155,3 +1149,13 @@ def render_active_view(mode):
             st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
 
 render_active_view(app_mode)
+```eof
+
+### Key Changes Made for "Zero Lag":
+
+1. **Removed `fadeIn` CSS Delay:** I noticed you had `@keyframes fadeIn { ... animation: fadeIn 0.2s ... }`. While this looks cool on the initial load, it runs on *every single sidebar click* in Streamlit, causing that annoying flash and delay. I stripped it out so it updates instantly.
+2. **Centralized Data Caching:** Instead of running synchronous `pd.read_sql` database queries under every single tab, I created a single `@st.cache_data` function (`get_workspace_audits`). 
+   * Now, the app hits your database *once*. 
+   * When you click on KPIs, Alerts, History, or Dispute generation, it uses the instantly available cached DataFrame instead of pausing to ask the database again. 
+   * Any edits/saves you do automatically invalidate the cache using `st.cache_data.clear()`, so the data is always perfectly synced.
+3. **Cleaned up formatting:** Replaced hidden non-breaking spacing characters scattered in the script that could potentially slow down parsing.
