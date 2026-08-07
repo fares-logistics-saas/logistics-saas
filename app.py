@@ -506,7 +506,6 @@ LANGUAGES = {
         "nav_vendor": "Vendor Risk Assessment",
         "nav_tariff": "AI Customs Tariff & HS Classifier",
         "nav_erp": "ERP & Webhook Integration",
-        "nav_roadmap": "🛡️ Feature Strategy & Roadmap",
     },
     "العربية": {
         "login_title": "🔐 تسجيل الدخول الآمن للمؤسسات (SSO & MFA)",
@@ -537,7 +536,6 @@ LANGUAGES = {
         "nav_vendor": "تقييم مخاطر الموردين",
         "nav_tariff": "محلل الرسوم الجمركية والتصنيف الذكي (HS)",
         "nav_erp": "ربط أنظمة الـ ERP والـ Webhooks",
-        "nav_roadmap": "🛡️ استراتيجية الميزات وخريطة الطريق",
     }
 }
 
@@ -789,7 +787,7 @@ elif category_choice == lang["cat_fin"]:
 elif category_choice == lang["cat_rep"]:
     app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]])
 else:
-    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"], lang["nav_roadmap"]])
+    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]])
 
 st.sidebar.markdown("---")
 st.sidebar.header("🌍 Multi-Currency & Settings")
@@ -844,7 +842,11 @@ def parse_invoice_with_ai(text, filename, currency):
             if t_match: data["Tracking ID"] = t_match.group(1).strip()
             if c_match: data["Container No"] = c_match.group(1).strip()
         except Exception as e:
-            st.toast(f"AI Extraction Timeout / Error: {e}", icon="⚠️")
+            err_str = str(e)
+            if "429" in err_str or "quota" in err_str.lower():
+                st.toast("💡 AI quota reached. Seamlessly using high-speed regex extraction fallback.", icon="⚡")
+            else:
+                st.toast(f"⚠️ AI Notice: {e}", icon="ℹ️")
             
     track_match = re.search(r"Tracking ID:\s*(.+)", text, re.IGNORECASE)
     cont_match = re.search(r"Container No:\s*(.+)", text, re.IGNORECASE)
@@ -1166,22 +1168,5 @@ def render_active_view(mode):
         if st.button("🧪 Test Webhook & Sync Verified Audits"):
             log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
             st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
-
-    elif mode == lang["nav_roadmap"]:
-        st.subheader("🛡️ Strategic Focus & Future Feature Architecture")
-        st.markdown("""
-        ### Current Assessment
-        Your Logistics SaaS Engine is already exceptionally feature-complete with AI OCR invoice parsing, Paddle live checkouts, multi-tier RBAC, IoT tracking, automated legal dispute generation, and multi-language support.
-        
-        ### Current Focus Areas
-        1. **Polish & Reliability:** Ensuring robust error handling for corrupted PDF uploads, missing API keys, and network timeouts.
-        2. **User Experience (UX):** Maintaining zero lag, responsive flat buttons, and clear interactive spinners/toasts.
-        3. **Thorough Testing:** End-to-end verification of user logins, workspace isolation, and database persistence.
-        
-        ### Future Feature Requirements (When Expanding Later)
-        - **Clear Error Handling:** Graceful fallback states for external API failures.
-        - **Visual Feedback:** Instant loading spinners, success toasts, and validation warnings.
-        - **Database Architecture:** Immutable schema migrations to keep data consistent across environments.
-        """)
 
 render_active_view(app_mode)
