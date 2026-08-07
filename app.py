@@ -24,6 +24,8 @@ from reportlab.lib import colors
 import openai
 import plotly.express as px
 
+st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout="wide", initial_sidebar_state="expanded")
+
 # --- Paddle Live Settings (Secrets) ---
 try:
     PRO_PRICE_ID = st.secrets["paddle"]["PRO_PRICE_ID"]
@@ -45,14 +47,17 @@ else:
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Database Engine Configuration ---
-DB_URL = "sqlite:///logistics_audits.db"
-if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
-    secret_url = st.secrets["postgres"]["url"]
-    if "hostname" not in secret_url and "port" not in secret_url and "username" not in secret_url:
-        DB_URL = secret_url
+# --- Database Engine Configuration (Cached for Zero Latency) ---
+@st.cache_resource
+def get_db_engine():
+    DB_URL = "sqlite:///logistics_audits.db"
+    if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
+        secret_url = st.secrets["postgres"]["url"]
+        if "hostname" not in secret_url and "port" not in secret_url and "username" not in secret_url:
+            DB_URL = secret_url
+    return sqlalchemy.create_engine(DB_URL, pool_pre_ping=True)
 
-engine = sqlalchemy.create_engine(DB_URL)
+engine = get_db_engine()
 
 # --- RBAC Permissions Matrix ---
 PERMISSIONS = {
@@ -67,10 +72,12 @@ def has_permission(role, action):
         return False
     return "all" in PERMISSIONS[role] or action in PERMISSIONS[role]
 
-# --- Initialize Enterprise Database Tables & Activity Logs ---
+# --- Initialize Enterprise Database Tables & Activity Logs (Run Once) ---
+@st.cache_resource
 def init_db():
+    db_url_str = str(engine.url)
     with engine.begin() as conn:
-        if "sqlite" in DB_URL:
+        if "sqlite" in db_url_str:
             conn.execute(sqlalchemy.text("""
                 CREATE TABLE IF NOT EXISTS audits (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,13 +195,17 @@ def init_db():
 init_db()
 
 def log_activity(username, workspace, action, target_id="N/A"):
-    with engine.begin() as conn:
-        conn.execute(sqlalchemy.text("""
-            INSERT INTO activity_logs (username, workspace, action, target_id)
-            VALUES (:u, :w, :a, :t)
-        """), {"u": username, "w": workspace, "a": action, "t": str(target_id)})
+    try:
+        with engine.begin() as conn:
+            conn.execute(sqlalchemy.text("""
+                INSERT INTO activity_logs (username, workspace, action, target_id)
+                VALUES (:u, :w, :a, :t)
+            """), {"u": username, "w": workspace, "a": action, "t": str(target_id)})
+    except Exception:
+        pass
 
 # --- Subscription & Billing Management ---
+@st.cache_data(ttl=15)
 def get_user_sub_info(username):
     with engine.connect() as conn:
         result = conn.execute(sqlalchemy.text("SELECT subscription_tier, invoices_processed FROM users WHERE username = :u"), {"u": username}).fetchone()
@@ -205,10 +216,12 @@ def get_user_sub_info(username):
 def increment_usage(username, count):
     with engine.begin() as conn:
         conn.execute(sqlalchemy.text("UPDATE users SET invoices_processed = invoices_processed + :c WHERE username = :u"), {"c": count, "u": username})
+    st.cache_data.clear()
 
 def upgrade_tier(username, new_tier):
     with engine.begin() as conn:
         conn.execute(sqlalchemy.text("UPDATE users SET subscription_tier = :t WHERE username = :u"), {"t": new_tier, "u": username})
+    st.cache_data.clear()
 
 PLAN_LIMITS = {
     "Free": 5,
@@ -216,7 +229,6 @@ PLAN_LIMITS = {
     "Enterprise": float('inf')
 }
 
-# (السر هنا) - تخزين الروابط مؤقتاً لزيادة السرعة الصاروخية للموقع
 @st.cache_data(ttl=3600)
 def create_paddle_checkout(plan_name, price_id, current_username):
     if not PADDLE_API_KEY or not price_id:
@@ -230,7 +242,7 @@ def create_paddle_checkout(plan_name, price_id, current_username):
             "items": [{"price_id": price_id, "quantity": 1}],
             "custom_data": {"username": current_username}
         }
-        res = requests.post("https://api.paddle.com/transactions", json=payload, headers=headers, timeout=5)
+        res = requests.post("https://api.paddle.com/transactions", json=payload, headers=headers, timeout=3)
         if res.status_code == 201:
             data = res.json()
             return data["data"]["checkout"]["url"]
@@ -264,7 +276,7 @@ def send_email_alert(recipient_email, filename, audit_status, container_no):
             """
             msg.attach(MIMEText(body, 'plain'))
 
-            server = smtplib.SMTP(smtp_server, smtp_port)
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=5)
             server.starttls()
             server.login(sender_email, sender_password)
             server.send_message(msg)
@@ -290,7 +302,7 @@ def send_automated_report(recipient_email, df):
             part.add_header('Content-Disposition', "attachment; filename=executive_report.pdf")
             msg.attach(part)
             
-            server = smtplib.SMTP(st.secrets["email"]["smtp_server"], int(st.secrets["email"]["smtp_port"]))
+            server = smtplib.SMTP(st.secrets["email"]["smtp_server"], int(st.secrets["email"]["smtp_port"]), timeout=5)
             server.starttls()
             server.login(st.secrets["email"]["sender_email"], st.secrets["email"]["sender_password"])
             server.send_message(msg)
@@ -306,7 +318,7 @@ def fetch_live_carrier_tracking(tracking_id, carrier="DHL"):
         try:
             api_url = st.secrets["carrier_api"][carrier.lower()]["url"] + f"/{tracking_id}"
             headers = {"Authorization": f"Bearer {st.secrets['carrier_api'][carrier.lower()]['token']}"}
-            response = requests.get(api_url, headers=headers, timeout=4)
+            response = requests.get(api_url, headers=headers, timeout=3)
             if response.status_code == 200:
                 data = response.json()
                 return data.get("status", "In Transit (Live API Synced)")
@@ -319,6 +331,7 @@ def add_user(username, password, role="Auditor", workspace="Default Corp", mfa_c
         with engine.begin() as conn:
             conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role, workspace, mfa_code, subscription_tier, invoices_processed) VALUES (:u, :p, :r, :w, :m, 'Free', 0)"),
                          {"u": username, "p": make_hashes(password), "r": role, "w": workspace, "m": mfa_code})
+        st.cache_data.clear()
         return True
     except Exception:
         return False
@@ -424,8 +437,6 @@ def generate_dispute_letter_pdf(filename, tracking_id, container_no, status):
     buffer.seek(0)
     return buffer
 
-st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout="wide", initial_sidebar_state="expanded")
-
 query_params = st.query_params
 if "payment_success" in query_params and query_params.get("payment_success") == "true":
     paid_plan = query_params.get("plan")
@@ -503,7 +514,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق ---
+# --- UI Styling Theme ---
 st.markdown("""
     <style>
     [data-testid="InputInstructions"], 
@@ -572,20 +583,6 @@ st.markdown("""
         outline: none !important;
     }
 
-    [data-baseweb="input"] button {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-    [data-baseweb="input"] button:hover {
-        background: transparent !important;
-        transform: scale(1.1) !important;
-        box-shadow: none !important;
-    }
-    [data-baseweb="input"] button svg {
-        fill: #93c5fd !important;
-    }
-
     [data-baseweb="input"], 
     [data-baseweb="base-input"], 
     [data-baseweb="select"] > div {
@@ -642,38 +639,12 @@ st.markdown("""
         color: white !important;
     }
 
-    .stRadio [role="radiogroup"] [role="radio"] div:first-of-type,
-    div[data-baseweb="radio"] > div {
-        border: none !important;
-        background-color: rgba(37, 99, 235, 0.3) !important;
-    }
-    .stRadio [role="radiogroup"] [role="radio"][aria-checked="true"] div:first-of-type,
-    div[data-baseweb="radio"] input:checked + div {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.9) !important;
-    }
-    
     section[data-testid="stSidebar"] {
         background-color: rgba(10, 15, 30, 0.9) !important;
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         border-right: none !important;
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
-    }
-    
-    div[data-baseweb="popover"], div[data-baseweb="menu"], ul[data-baseweb="menu"] {
-        background-color: #0f172a !important;
-        border: none !important;
-        border-radius: 12px !important;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8) !important;
-    }
-    li[data-baseweb="option"] {
-        color: #f8fafc !important;
-        background-color: #0f172a !important;
-    }
-    li[data-baseweb="option"]:hover {
-        background-color: #1e3a8a !important;
-        color: #60a5fa !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -705,7 +676,6 @@ if not st.session_state["logged_in"]:
                         st.session_state["role"] = role
                         st.session_state["workspace"] = workspace
                         
-                        # منطق التحقق من عدد مرات الدخول لعرض الترحيب المناسب
                         with engine.connect() as conn:
                             log_count = conn.execute(sqlalchemy.text("SELECT COUNT(*) FROM activity_logs WHERE username = :u AND action = 'USER_LOGIN'"), {"u": l_user.strip()}).scalar()
                         
@@ -782,7 +752,6 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
 
-# تسريع كبير في قراءة الملفات من خلال قراءة الصفحة الأولى فقط
 def extract_text_from_pdf(pdf_path):
     text = ""
     try:
@@ -816,12 +785,11 @@ def parse_invoice_with_ai(text, filename, currency):
     if "openai" in st.secrets and use_ai_engine:
         try:
             client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
-            # تسريع الذكاء الاصطناعي بتقليل حجم النص المرسل والاستجابة
             prompt = f"""
             Extract precisely from invoice text: Tracking ID, Container No, Port of Discharge, HS Code, Stamp & Signature Status, Date, Ocean Freight, Customs Fee.
             Invoice Text: {text[:1500]}
             """
-            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}], temperature=0, max_tokens=150)
+            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}], temperature=0, max_tokens=150, timeout=4)
             ai_output = response.choices[0].message.content
             
             t_match = re.search(r"Tracking ID:\s*(.+)", ai_output, re.IGNORECASE)
@@ -871,12 +839,11 @@ if app_mode == lang["nav_process"]:
             if len(uploaded_files) > remaining:
                 st.error(f"⚠️ You are trying to upload {len(uploaded_files)} files, but you only have {remaining} scans left. Please upgrade.")
             else:
-                with st.status(f"🚀 بدء معالجة وتدقيق {len(uploaded_files)} ملف(ات)...", expanded=True) as status:
+                with st.status(f"🚀 Processing and auditing {len(uploaded_files)} file(s)...", expanded=True) as status:
                     batch_results = []
                     discrepancy_alerts_count = 0
                     emails_sent_count = 0
                     
-                    st.write("📄 قراءة الملفات واستخراج النصوص...")
                     for uploaded_file in uploaded_files:
                         temp_file_path = f"temp_{getattr(uploaded_file, 'name', 'camera_capture.jpg')}"
                         raw_text = ""
@@ -893,22 +860,18 @@ if app_mode == lang["nav_process"]:
                         
                         fname = getattr(uploaded_file, 'name', 'mobile_capture.jpg')
                         if raw_text.strip():
-                            st.write(f"🤖 تشغيل محرك الذكاء الاصطناعي للملف: {fname}...")
                             parsed_data = parse_invoice_with_ai(raw_text, fname, selected_currency)
-                            
-                            st.write(f"💾 حفظ البيانات في قاعدة البيانات السحابية...")
                             save_to_db(parsed_data, st.session_state["username"], st.session_state["workspace"])
                             batch_results.append(parsed_data)
                             
                             if parsed_data["Audit Status"] != "✅ Approved":
                                 discrepancy_alerts_count += 1
                                 if alert_email_recipient:
-                                    st.write(f"📧 إرسال تنبيه الفروقات المالية عبر البريد...")
                                     sent = send_email_alert(alert_email_recipient, parsed_data["Filename"], parsed_data["Audit Status"], parsed_data["Container No"])
                                     if sent:
                                         emails_sent_count += 1
                     
-                    status.update(label="✅ تمت عملية المعالجة والتدقيق بنجاح تام!", state="complete", expanded=False)
+                    status.update(label="✅ Processing & Auditing Complete!", state="complete", expanded=False)
                         
                 if batch_results:
                     increment_usage(st.session_state["username"], len(batch_results))
@@ -969,7 +932,7 @@ elif app_mode == lang["nav_billing"]:
             if checkout_url:
                 st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
             else:
-                st.warning("⚠️ بوابة الدفع غير متاحة حالياً. يرجى مراجعة إعدادات المفاتيح (Secrets).")
+                st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
 
     with col3:
         st.markdown("""
@@ -993,7 +956,7 @@ elif app_mode == lang["nav_billing"]:
             if checkout_url_ent:
                 st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
             else:
-                st.warning("⚠️ بوابة الدفع غير متاحة حالياً. يرجى مراجعة إعدادات المفاتيح (Secrets).")
+                st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
 
 elif app_mode == lang["nav_review"]:
     st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
