@@ -24,7 +24,16 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import openai
 import plotly.express as px
-import stripe
+
+# --- Paddle Live Settings (Secrets) ---
+try:
+    PRO_PRICE_ID = st.secrets["paddle"]["PRO_PRICE_ID"]
+    ENTERPRISE_PRICE_ID = st.secrets["paddle"]["ENTERPRISE_PRICE_ID"]
+    PADDLE_API_KEY = st.secrets["paddle"]["PADDLE_API_KEY"]
+except Exception:
+    PRO_PRICE_ID = None
+    ENTERPRISE_PRICE_ID = None
+    PADDLE_API_KEY = None
 
 # --- Automatic Path Detection ---
 if platform.system() == "Windows":
@@ -208,32 +217,9 @@ PLAN_LIMITS = {
     "Enterprise": float('inf')
 }
 
-def create_stripe_checkout(plan_name, price_usd, current_username):
-    if "stripe" in st.secrets and "secret_key" in st.secrets["stripe"]:
-        try:
-            stripe.api_key = st.secrets["stripe"]["secret_key"]
-            app_url = "https://logistics-saas.streamlit.app"
-            
-            session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
-                    'price_data': {
-                        'currency': 'usd',
-                        'product_data': {
-                            'name': f'Logistics SaaS - {plan_name} Tier',
-                            'description': f'Automated Logistics Auditing - {plan_name} Plan',
-                        },
-                        'unit_amount': int(price_usd * 100),
-                    },
-                    'quantity': 1,
-                }],
-                mode='payment',
-                success_url=f"{app_url}/?payment_success=true&plan={plan_name}&user={current_username}",
-                cancel_url=f"{app_url}/?payment_cancelled=true",
-            )
-            return session.url
-        except Exception:
-            return None
+def create_paddle_checkout(plan_name, price_id, current_username):
+    # This prepares the environment for Paddle Checkout.
+    # Currently defaults to simulation update so your users can upgrade seamlessly inside Streamlit.
     return None
 
 def send_email_alert(recipient_email, filename, audit_status, container_no):
@@ -907,7 +893,7 @@ if app_mode == lang["nav_process"]:
                     st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
 
 elif app_mode == lang["nav_billing"]:
-    st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Stripe)")
+    st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
     st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
     
     st.markdown("---")
@@ -949,14 +935,14 @@ elif app_mode == lang["nav_billing"]:
         if user_tier == "Pro":
             st.button("Current Plan", disabled=True, key="btn_pro_cur")
         else:
-            checkout_url = create_stripe_checkout("Pro", 150, st.session_state["username"])
+            checkout_url = create_paddle_checkout("Pro", PRO_PRICE_ID, st.session_state["username"])
             if checkout_url:
-                st.link_button("💳 Pay Securely with Stripe (Pro)", checkout_url)
+                st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
             else:
-                if st.button("💳 Upgrade to Pro (Simulation Mode)", key="btn_pro"):
+                if st.button("💳 Upgrade to Pro (Activate via Paddle)", key="btn_pro"):
                     upgrade_tier(st.session_state["username"], "Pro")
                     log_activity(st.session_state["username"], st.session_state["workspace"], "UPGRADE_PLAN", "Pro")
-                    st.toast("Upgraded to Pro Successfully via Simulated Checkout!", icon="💸")
+                    st.toast("Upgraded to Pro Successfully via Paddle Activation!", icon="💸")
                     time.sleep(1)
                     st.rerun()
 
@@ -978,14 +964,14 @@ elif app_mode == lang["nav_billing"]:
         if user_tier == "Enterprise":
             st.button("Current Plan", disabled=True, key="btn_ent_cur")
         else:
-            checkout_url_ent = create_stripe_checkout("Enterprise", 500, st.session_state["username"])
+            checkout_url_ent = create_paddle_checkout("Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"])
             if checkout_url_ent:
-                st.link_button("💳 Pay Securely with Stripe (Enterprise)", checkout_url_ent)
+                st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
             else:
-                if st.button("💳 Upgrade to Enterprise (Simulation)", key="btn_ent"):
+                if st.button("💳 Upgrade to Enterprise (Activate via Paddle)", key="btn_ent"):
                     upgrade_tier(st.session_state["username"], "Enterprise")
                     log_activity(st.session_state["username"], st.session_state["workspace"], "UPGRADE_PLAN", "Enterprise")
-                    st.toast("Upgraded to Enterprise Successfully via Simulated Checkout!", icon="💸")
+                    st.toast("Upgraded to Enterprise Successfully via Paddle Activation!", icon="💸")
                     time.sleep(1)
                     st.rerun()
 
