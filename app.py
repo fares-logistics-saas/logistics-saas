@@ -216,6 +216,8 @@ PLAN_LIMITS = {
     "Enterprise": float('inf')
 }
 
+# (السر هنا) - تخزين الروابط مؤقتاً لزيادة السرعة الصاروخية للموقع
+@st.cache_data(ttl=3600)
 def create_paddle_checkout(plan_name, price_id, current_username):
     if not PADDLE_API_KEY or not price_id:
         return None
@@ -228,7 +230,7 @@ def create_paddle_checkout(plan_name, price_id, current_username):
             "items": [{"price_id": price_id, "quantity": 1}],
             "custom_data": {"username": current_username}
         }
-        res = requests.post("https://api.paddle.com/transactions", json=payload, headers=headers)
+        res = requests.post("https://api.paddle.com/transactions", json=payload, headers=headers, timeout=5)
         if res.status_code == 201:
             data = res.json()
             return data["data"]["checkout"]["url"]
@@ -298,6 +300,7 @@ def send_automated_report(recipient_email, df):
             return False
     return False
 
+@st.cache_data(ttl=60)
 def fetch_live_carrier_tracking(tracking_id, carrier="DHL"):
     if "carrier_api" in st.secrets and carrier.lower() in st.secrets["carrier_api"]:
         try:
@@ -702,7 +705,7 @@ if not st.session_state["logged_in"]:
                         st.session_state["role"] = role
                         st.session_state["workspace"] = workspace
                         
-                        # منطق التحقق من عدد مرات الدخول (Welcome مقابل Welcome back)
+                        # منطق التحقق من عدد مرات الدخول لعرض الترحيب المناسب
                         with engine.connect() as conn:
                             log_count = conn.execute(sqlalchemy.text("SELECT COUNT(*) FROM activity_logs WHERE username = :u AND action = 'USER_LOGIN'"), {"u": l_user.strip()}).scalar()
                         
@@ -779,21 +782,20 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
 
+# تسريع كبير في قراءة الملفات من خلال قراءة الصفحة الأولى فقط
 def extract_text_from_pdf(pdf_path):
     text = ""
     try:
         reader = pypdf.PdfReader(pdf_path)
-        for page in reader.pages:
-            extracted = page.extract_text()
-            if extracted:
-                text += extracted + "\n"
+        if len(reader.pages) > 0:
+            text = reader.pages[0].extract_text()
     except Exception:
         pass
     if not text.strip():
         try:
-            images = convert_from_path(pdf_path, poppler_path=POPPLER_PATH)
-            for image in images:
-                text += pytesseract.image_to_string(image) + "\n"
+            images = convert_from_path(pdf_path, poppler_path=POPPLER_PATH, first_page=1, last_page=1)
+            if images:
+                text = pytesseract.image_to_string(images[0])
         except Exception:
             pass
     return text
@@ -814,11 +816,12 @@ def parse_invoice_with_ai(text, filename, currency):
     if "openai" in st.secrets and use_ai_engine:
         try:
             client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+            # تسريع الذكاء الاصطناعي بتقليل حجم النص المرسل والاستجابة
             prompt = f"""
             Extract precisely from invoice text: Tracking ID, Container No, Port of Discharge, HS Code, Stamp & Signature Status, Date, Ocean Freight, Customs Fee.
-            Invoice Text: {text[:3000]}
+            Invoice Text: {text[:1500]}
             """
-            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}], temperature=0)
+            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}], temperature=0, max_tokens=150)
             ai_output = response.choices[0].message.content
             
             t_match = re.search(r"Tracking ID:\s*(.+)", ai_output, re.IGNORECASE)
@@ -868,7 +871,6 @@ if app_mode == lang["nav_process"]:
             if len(uploaded_files) > remaining:
                 st.error(f"⚠️ You are trying to upload {len(uploaded_files)} files, but you only have {remaining} scans left. Please upgrade.")
             else:
-                # استخدام st.status التفاعلية لإعطاء شعور بالسرعة والاحترافية والشفافية
                 with st.status(f"🚀 بدء معالجة وتدقيق {len(uploaded_files)} ملف(ات)...", expanded=True) as status:
                     batch_results = []
                     discrepancy_alerts_count = 0
@@ -967,7 +969,7 @@ elif app_mode == lang["nav_billing"]:
             if checkout_url:
                 st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
             else:
-                st.error("⚠️ فشل الاتصال مع Paddle. يرجى مراجعة إعدادات المفاتيح (Secrets).")
+                st.warning("⚠️ بوابة الدفع غير متاحة حالياً. يرجى مراجعة إعدادات المفاتيح (Secrets).")
 
     with col3:
         st.markdown("""
@@ -991,7 +993,7 @@ elif app_mode == lang["nav_billing"]:
             if checkout_url_ent:
                 st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
             else:
-                st.error("⚠️ فشل الاتصال مع Paddle. يرجى مراجعة إعدادات المفاتيح (Secrets).")
+                st.warning("⚠️ بوابة الدفع غير متاحة حالياً. يرجى مراجعة إعدادات المفاتيح (Secrets).")
 
 elif app_mode == lang["nav_review"]:
     st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
