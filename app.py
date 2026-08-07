@@ -434,10 +434,9 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- تصميم الثيم الساحق: إبادة تامة لأي لون أحمر وتوحيد أزرار (+ و -) لتكون زجاجية مثل Log out ---
+# --- تصميم الثيم الساحق: فصل أزرار (+ و -) ومنع تداخل الحدود لتكون أزرار منفصلة وزجاجية بالكامل ---
 st.markdown("""
     <style>
-    /* 🔴 إبادة كاملة لجملة Form وسجل الأخطاء أو اللون الأحمر */
     [data-testid="InputInstructions"], 
     div[data-testid="stFormSubmitInstructions"],
     .st-emotion-cache-1kyxreq,
@@ -465,16 +464,14 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    /* 💎 توحيد جميع الأزرار، بما فيها أزرار الـ (+ / -) في حقول الأرقام لتكون زجاجية زرقاء تماماً مثل Log out 💎 */
+    /* توحيد الأزرار العامة */
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
     [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapseButton"],
     button[kind="header"],
-    [data-testid="stFileUploader"] button,
-    .stNumberInput button,
-    div[data-baseweb="spinbutton"] button {
+    [data-testid="stFileUploader"] button {
         border-radius: 12px !important;
         font-weight: 700 !important;
         background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%) !important;
@@ -485,14 +482,23 @@ st.markdown("""
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
-    /* 💎 تأثير التحويم (Hover) لجميع الأزرار 💎 */
+    /* إصلاح جذري لأزرار الـ (+ و -) في حقول الأرقام لتقسيمها وتجنب أي تداخل حدود */
+    .stNumberInput button, div[data-baseweb="spinbutton"] button {
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(29, 78, 216, 1) 100%) !important;
+        color: white !important;
+        border: 1px solid rgba(147, 197, 253, 0.6) !important;
+        margin: 0 3px !important;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
+    }
+
     .stButton > button:hover, 
     [data-testid="collapsedControl"]:hover,
     [data-testid="stSidebarCollapseButton"]:hover,
     button[kind="header"]:hover,
     [data-testid="stFileUploader"] button:hover,
-    .stNumberInput button:hover,
-    div[data-baseweb="spinbutton"] button:hover {
+    .stNumberInput button:hover, div[data-baseweb="spinbutton"] button:hover {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
         box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
         border-color: #93c5fd !important;
@@ -500,7 +506,6 @@ st.markdown("""
         outline: none !important;
     }
 
-    /* استثناء زر العين داخل الحقول السرية */
     [data-baseweb="input"] button {
         background: transparent !important;
         border: none !important;
@@ -515,7 +520,6 @@ st.markdown("""
         fill: #93c5fd !important;
     }
 
-    /* حقول الإدخال الزجاجية بدون أي لون أحمر */
     [data-baseweb="input"], 
     [data-baseweb="base-input"], 
     [data-baseweb="select"] > div {
