@@ -544,10 +544,10 @@ LANGUAGES = {
     }
 }
 
-# --- اللوجو الشفاف المتمركز بدقة للقائمة الجانبية ---
+# --- اللوجو المرتب في القائمة الجانبية ---
 logo_svg = """
 <div class="custom-logo-container">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 90" width="100%" height="100%">
   <defs>
     <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b82f6" />
@@ -558,7 +558,8 @@ logo_svg = """
       <stop offset="100%" stop-color="#059669" />
     </linearGradient>
   </defs>
-  <g transform="translate(118, -2) scale(0.72)">
+  <!-- الأيقونة في الأعلى -->
+  <g transform="translate(65, 0) scale(0.55)">
     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -566,7 +567,8 @@ logo_svg = """
     <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
-  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+  <!-- النص في الأسفل مرتب -->
+  <text x="100" y="78" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="8" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 """
@@ -582,7 +584,7 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
-# --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
+# --- UI Styling Theme & Hover Glow Fix ---
 st.markdown("""
     <style>
     html, body, [data-testid="stApp"], .stApp {
@@ -619,30 +621,27 @@ st.markdown("""
     }
     
     .custom-logo-container {
-        padding: 6px 8px;
+        padding: 4px 6px;
         background: transparent;
         text-align: center;
     }
-    .custom-logo-container svg {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
     
     [data-testid="stSidebar"] [data-testid="stButton"]:first-of-type {
-        margin-top: -75px !important;
+        margin-top: -90px !important;
         margin-bottom: 0px !important;
         position: relative !important;
         z-index: 9999 !important;
     }
     [data-testid="stSidebar"] [data-testid="stButton"]:first-of-type button {
-        height: 75px !important;
+        height: 90px !important;
         width: 100% !important;
         opacity: 0 !important;
         cursor: pointer !important;
     }
     
-    [data-testid="stSidebar"]:has([data-testid="stButton"]:first-of-type button:hover) .custom-logo-container svg {
-        filter: drop-shadow(0px 0px 14px rgba(59, 130, 246, 1));
-        transform: scale(1.03);
+    /* إضاءة الأيقونة وحدها عند تمرير الماوس في القائمة الجانبية */
+    [data-testid="stSidebar"]:has([data-testid="stButton"]:first-of-type button:hover) .custom-logo-container svg g {
+        filter: drop-shadow(0px 0px 12px rgba(59, 130, 246, 1));
     }
 
     .stButton > button, 
@@ -756,6 +755,22 @@ st.markdown("""
         border-right: none !important;
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
+    
+    /* تنسيق صفحة الشرح واللوجو الكبير المترتب بمنتصف الصفحة مع إضاءة اللوجو وحده عند المرور عليه */
+    .landing-logo-container-center {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+    .landing-logo-container-center svg g {
+        transition: filter 0.3s ease;
+    }
+    .landing-logo-container-center svg:hover g {
+        filter: drop-shadow(0px 0px 20px rgba(59, 130, 246, 0.95));
+    }
+    
     .landing-card {
         background: rgba(15, 23, 42, 0.6); padding: 25px; border-radius: 12px; border: 1px solid rgba(59,130,246,0.2); height: 100%; transition: all 0.3s ease;
     }
@@ -765,11 +780,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- دالة عرض صفحة الشرح (Landing Page) ---
+# --- دالة عرض صفحة الشرح (Landing Page) مع اللوجو الكبير المترتب في المنتصف ---
 def render_landing_page(lang_dict):
     big_logo_svg = """
-    <div style="display: flex; justify-content: center; align-items: center; margin-top: 3rem; margin-bottom: 2rem;">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80" width="450" height="120">
+    <div class="landing-logo-container-center">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 130" width="320" height="130">
       <defs>
         <linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#3b82f6" />
@@ -780,7 +795,8 @@ def render_landing_page(lang_dict):
           <stop offset="100%" stop-color="#059669" />
         </linearGradient>
       </defs>
-      <g transform="translate(115, -12) scale(0.9)">
+      <!-- الأيقونة في الأعلى وكبيرة -->
+      <g transform="translate(110, 5) scale(0.9)">
         <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBig)" stroke-width="4" stroke-linejoin="round" />
         <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBig)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
         <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -788,15 +804,16 @@ def render_landing_page(lang_dict):
         <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
         <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
       </g>
-      <text x="150" y="80" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+      <!-- النص مرتب تحته تماماً -->
+      <text x="150" y="115" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="10" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
     </svg>
     </div>
     """
     st.markdown(big_logo_svg, unsafe_allow_html=True)
     
     st.markdown(f"""
-    <h1 style='text-align: center; color: #f8fafc; font-size: 2.5rem; margin-bottom: 1rem;'>{lang_dict['landing_title']}</h1>
-    <p style='text-align: center; font-size: 1.2rem; color: #94a3b8; max-width: 800px; margin: 0 auto 3rem auto; line-height: 1.6;'>
+    <h1 style='text-align: center; color: #f8fafc; font-size: 2.3rem; margin-bottom: 1rem;'>{lang_dict['landing_title']}</h1>
+    <p style='text-align: center; font-size: 1.15rem; color: #94a3b8; max-width: 800px; margin: 0 auto 3rem auto; line-height: 1.6;'>
     {lang_dict['landing_desc']}
     </p>
     """, unsafe_allow_html=True)
