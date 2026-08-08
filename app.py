@@ -539,8 +539,9 @@ LANGUAGES = {
     }
 }
 
-# --- اللوجو الشفاف المتمركز بدقة مع تقليل المسافة وكبر الحجم ---
+# --- Clickable Logo with Explanation Page Link ---
 logo_svg = """
+<a href="?view=about" target="_self" style="text-decoration: none; display: block;">
 <div class="custom-logo-container">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
   <defs>
@@ -568,6 +569,7 @@ logo_svg = """
   <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
+</a>
 """
 st.sidebar.markdown(logo_svg, unsafe_allow_html=True)
 st.sidebar.markdown("---")
@@ -742,6 +744,40 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# --- Explanation Page Handler (Triggered when Logo is Clicked) ---
+if st.query_params.get("view") == "about":
+    st.title("📖 About LogiAudit SaaS Engine")
+    st.markdown("### Welcome to the Platform Overview")
+    st.write("""
+    **LogiAudit SaaS Engine** is an enterprise-grade, B2B logistics auditing and invoice intelligence platform built for global shipping hubs, freight forwarders, and corporate supply chain departments.
+    """)
+    
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("#### 🚀 Key Features & Capabilities")
+        st.markdown("""
+        * **Automated OCR & AI Sensor:** Instantly extracts tracking IDs, container numbers, ports, and fees from uploaded invoices (PDF/Images) with intelligent regex fallback.
+        * **Multi-Tier RBAC:** Secure role-based access control for Admins, CFOs, Auditors, and Viewers.
+        * **Enterprise Billing (Paddle):** Built-in subscription tiers (Free, Pro, Enterprise) with secure payment gateway integrations.
+        * **Dispute & Legal Automation:** Generates professional PDF formal financial dispute notices and chargeback requests.
+        * **IoT GPS & Live Tracking:** Syncs with carrier APIs (DHL, Aramex, Maersk) for real-time container satellite tracking.
+        """)
+    with col2:
+        st.markdown("#### 💼 Business Value & Architecture")
+        st.markdown("""
+        * **Zero Latency & High Performance:** Optimized database caching and anti-flash UI themes for lightning-fast navigation.
+        * **Executive Reporting:** Generates immutable audit trails and executive PDF summary reports instantly.
+        * **Multi-Language Support:** Full localization for English and Arabic users.
+        * **Financial Leakage Protection:** Automatically flags freight and customs discrepancies to save thousands in overcharges.
+        """)
+        
+    st.markdown("---")
+    if st.button("⬅️ Back to Logistics Engine", type="primary"):
+        st.query_params.clear()
+        st.rerun()
+    st.stop()
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -979,17 +1015,17 @@ def render_active_view(mode):
                                         if sent:
                                             emails_sent_count += 1
                         
-                        if batch_results:
-                            increment_usage(st.session_state["username"], len(batch_results))
-                            st.toast('Batch Sensor Auditing Complete!', icon='🎯')
-                            st.success("✅ Audit Engine processing finished successfully with robust error checking.")
-                            
-                            if discrepancy_alerts_count > 0:
-                                st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
-                                if emails_sent_count > 0:
-                                    st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
-                                    
-                            st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
+                    if batch_results:
+                        increment_usage(st.session_state["username"], len(batch_results))
+                        st.toast('Batch Sensor Auditing Complete!', icon='🎯')
+                        st.success("✅ Audit Engine processing finished successfully with robust error checking.")
+                        
+                        if discrepancy_alerts_count > 0:
+                            st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
+                            if emails_sent_count > 0:
+                                st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
+                                
+                        st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
 
     elif mode == lang["nav_billing"]:
         st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
