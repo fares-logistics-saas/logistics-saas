@@ -748,7 +748,30 @@ st.markdown("""
 # --- Explanation Page Handler (Triggered when Logo is Clicked) ---
 if st.query_params.get("view") == "about":
     st.markdown("""
-        <div style="text-align: center; padding: 2rem 1rem;">
+        <div style="text-align: center; padding: 1.5rem 1rem 0.5rem 1rem;">
+            <div style="max-width: 140px; margin: 0 auto 1.5rem auto;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
+                  <defs>
+                    <linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#3b82f6" />
+                      <stop offset="100%" stop-color="#1d4ed8" />
+                    </linearGradient>
+                    <linearGradient id="accentGradBig" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#10b981" />
+                      <stop offset="100%" stop-color="#059669" />
+                    </linearGradient>
+                  </defs>
+                  <g transform="translate(118, -2) scale(0.72)">
+                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBig)" stroke-width="4" stroke-linejoin="round" />
+                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBig)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
+                    <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+                    <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+                    <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
+                    <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                  </g>
+                  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+                </svg>
+            </div>
             <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
             <p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin: 0 auto 3rem auto; line-height: 1.6;">
                 LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.
