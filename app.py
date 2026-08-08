@@ -565,8 +565,8 @@ logo_svg = """
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
 
-  <!-- Centered Single Line Text matching exact clean style -->
-  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="700" fill="#f8fafc" text-anchor="middle">LogiAudit SaaS ENGINE</text>
+  <!-- Centered Single Line Text, Closer to Logo -->
+  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 </a>
@@ -617,25 +617,18 @@ st.markdown("""
     .custom-logo-container {
         padding: 6px 8px;
         border-radius: 12px;
-        background: transparent !important;
+        background: transparent;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         margin-bottom: -0.5rem;
         cursor: pointer;
-        border: 1px solid transparent !important;
+        border: 1px solid transparent;
         text-align: center;
-        box-shadow: none !important;
     }
     .custom-logo-container:hover {
-        background: transparent !important;
-        box-shadow: none !important;
-        border-color: transparent !important;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        border-color: rgba(59, 130, 246, 0.3);
         transform: translateY(-1px);
-    }
-    .custom-logo-container svg {
-        transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .custom-logo-container:hover svg {
-        filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
     }
 
     .about-logo-container {
@@ -659,7 +652,7 @@ st.markdown("""
         transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .about-logo-container:hover svg {
-        filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.9)) drop-shadow(0 0 8px rgba(16, 185, 129, 0.7));
+        filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 5px rgba(16, 185, 129, 0.6));
     }
 
     .stButton > button, 
@@ -799,7 +792,7 @@ if st.query_params.get("view") == "about":
 <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
 <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
 </g>
-<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#f8fafc" text-anchor="middle">LogiAudit SaaS ENGINE</text>
+<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
