@@ -631,6 +631,24 @@ st.markdown("""
         transform: translateY(-1px);
     }
 
+    .about-logo-container {
+        width: 380px;
+        margin: 0 auto 1.5rem auto;
+        padding: 16px;
+        border-radius: 16px;
+        background: transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        border: 1px solid transparent;
+        display: block;
+    }
+    .about-logo-container:hover {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.22) 0%, rgba(16, 185, 129, 0.22) 100%);
+        box-shadow: 0 0 30px rgba(59, 130, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        border-color: rgba(59, 130, 246, 0.4);
+        transform: translateY(-2px);
+    }
+
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
@@ -748,7 +766,7 @@ st.markdown("""
 # --- Explanation Page Handler (Triggered when Logo is Clicked) ---
 if st.query_params.get("view") == "about":
     st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
-<div style="width: 380px; margin: 0 auto 1.5rem auto; display: block;">
+<div class="about-logo-container">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
 <defs>
 <linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
