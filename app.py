@@ -747,36 +747,54 @@ st.markdown("""
 
 # --- Explanation Page Handler (Triggered when Logo is Clicked) ---
 if st.query_params.get("view") == "about":
-    st.title("📖 About LogiAudit SaaS Engine")
-    st.markdown("### Welcome to the Platform Overview")
-    st.write("""
-    **LogiAudit SaaS Engine** is an enterprise-grade, B2B logistics auditing and invoice intelligence platform built for global shipping hubs, freight forwarders, and corporate supply chain departments.
-    """)
+    st.markdown("""
+        <div style="text-align: center; padding: 2rem 1rem;">
+            <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
+            <p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin: 0 auto 3rem auto; line-height: 1.6;">
+                LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
     
-    st.markdown("---")
-    col1, col2 = st.columns(2)
     with col1:
-        st.markdown("#### 🚀 Key Features & Capabilities")
         st.markdown("""
-        * **Automated OCR & AI Sensor:** Instantly extracts tracking IDs, container numbers, ports, and fees from uploaded invoices (PDF/Images) with intelligent regex fallback.
-        * **Multi-Tier RBAC:** Secure role-based access control for Admins, CFOs, Auditors, and Viewers.
-        * **Enterprise Billing (Paddle):** Built-in subscription tiers (Free, Pro, Enterprise) with secure payment gateway integrations.
-        * **Dispute & Legal Automation:** Generates professional PDF formal financial dispute notices and chargeback requests.
-        * **IoT GPS & Live Tracking:** Syncs with carrier APIs (DHL, Aramex, Maersk) for real-time container satellite tracking.
-        """)
-    with col2:
-        st.markdown("#### 💼 Business Value & Architecture")
-        st.markdown("""
-        * **Zero Latency & High Performance:** Optimized database caching and anti-flash UI themes for lightning-fast navigation.
-        * **Executive Reporting:** Generates immutable audit trails and executive PDF summary reports instantly.
-        * **Multi-Language Support:** Full localization for English and Arabic users.
-        * **Financial Leakage Protection:** Automatically flags freight and customs discrepancies to save thousands in overcharges.
-        """)
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">🤖 AI-Powered Extraction</h3>
+                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
+                    Automatically extract tracking IDs, container numbers, and ocean freight costs from complex PDF invoices in seconds with zero manual data entry.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
         
-    st.markdown("---")
-    if st.button("⬅️ Back to Logistics Engine", type="primary"):
-        st.query_params.clear()
-        st.rerun()
+    with col2:
+        st.markdown("""
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">💰 Financial Protection</h3>
+                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
+                    Instantly flag discrepancies where billed amounts exceed your master service agreement (MSA) caps. Stop paying for errors and overcharges.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown("""
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">⚖️ Automated Disputes</h3>
+                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
+                    Generate legal-grade dispute notices instantly to request credit notes and chargebacks from vendors. Syncs seamlessly with CFO workflows.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    with col_btn2:
+        if st.button("🚀 Enter Workspace Dashboard", use_container_width=True, type="primary"):
+            st.query_params.clear()
+            st.rerun()
     st.stop()
 
 if "logged_in" not in st.session_state:
