@@ -1034,11 +1034,11 @@ def render_active_view(mode, legal_choice):
     
     # Handle Legal & Pricing Pages Selected from Bottom Sidebar
     if legal_choice == "Pricing":
-        st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
-        st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
+        st.subheader("🏷️ Pricing Plans & Feature Tiers")
+        st.write("Review our transparent pricing tiers designed for logistics teams of all sizes.")
         st.markdown("---")
-        col1, col2, col3 = st.columns(3)
         
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown("""
             <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
@@ -1052,11 +1052,8 @@ def render_active_view(mode, legal_choice):
                     <li>Community Support</li>
                 </ul>
             </div>
-            <br>
             """, unsafe_allow_html=True)
-            if user_tier == "Free":
-                st.button("Current Plan", disabled=True, key="btn_free_pricing")
-                
+            
         with col2:
             st.markdown("""
             <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
@@ -1068,18 +1065,10 @@ def render_active_view(mode, legal_choice):
                     <li>50 Invoice Scans / month</li>
                     <li>PDF Executive Reports</li>
                     <li>Priority Email Alerts</li>
+                    <li>Basic ERP Integrations</li>
                 </ul>
             </div>
-            <br>
             """, unsafe_allow_html=True)
-            if user_tier == "Pro":
-                st.button("Current Plan", disabled=True, key="btn_pro_cur_pricing")
-            else:
-                checkout_url = create_paddle_checkout("Pro", PRO_PRICE_ID, st.session_state["username"])
-                if checkout_url:
-                    st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
-                else:
-                    st.warning("⚠️ Payment gateway currently unavailable.")
 
         with col3:
             st.markdown("""
@@ -1092,18 +1081,12 @@ def render_active_view(mode, legal_choice):
                     <li><b>Unlimited</b> Invoice Scans</li>
                     <li>Full ERP Webhook Access</li>
                     <li>24/7 Dedicated Account Rep</li>
+                    <li>Custom SLA Agreements</li>
                 </ul>
             </div>
-            <br>
             """, unsafe_allow_html=True)
-            if user_tier == "Enterprise":
-                st.button("Current Plan", disabled=True, key="btn_ent_cur_pricing")
-            else:
-                checkout_url_ent = create_paddle_checkout("Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"])
-                if checkout_url_ent:
-                    st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
-                else:
-                    st.warning("⚠️ Payment gateway currently unavailable.")
+            
+        st.info("💡 To upgrade or manage your subscription securely via Paddle, please visit **Billing & Subscriptions** under the **Finance & Billing** menu in the operations navigation above.")
         return
 
     elif legal_choice == "Privacy Policy":
@@ -1230,7 +1213,7 @@ def render_active_view(mode, legal_choice):
             <br>
             """, unsafe_allow_html=True)
             if user_tier == "Free":
-                st.button("Current Plan", disabled=True, key="btn_free")
+                st.button("Current Plan", disabled=True, key="btn_free_billing")
                 
         with col2:
             st.markdown("""
@@ -1243,12 +1226,13 @@ def render_active_view(mode, legal_choice):
                     <li>50 Invoice Scans / month</li>
                     <li>PDF Executive Reports</li>
                     <li>Priority Email Alerts</li>
+                    <li>Basic ERP Integrations</li>
                 </ul>
             </div>
             <br>
             """, unsafe_allow_html=True)
             if user_tier == "Pro":
-                st.button("Current Plan", disabled=True, key="btn_pro_cur")
+                st.button("Current Plan", disabled=True, key="btn_pro_cur_billing")
             else:
                 checkout_url = create_paddle_checkout("Pro", PRO_PRICE_ID, st.session_state["username"])
                 if checkout_url:
@@ -1267,12 +1251,13 @@ def render_active_view(mode, legal_choice):
                     <li><b>Unlimited</b> Invoice Scans</li>
                     <li>Full ERP Webhook Access</li>
                     <li>24/7 Dedicated Account Rep</li>
+                    <li>Custom SLA Agreements</li>
                 </ul>
             </div>
             <br>
             """, unsafe_allow_html=True)
             if user_tier == "Enterprise":
-                st.button("Current Plan", disabled=True, key="btn_ent_cur")
+                st.button("Current Plan", disabled=True, key="btn_ent_cur_billing")
             else:
                 checkout_url_ent = create_paddle_checkout("Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"])
                 if checkout_url_ent:
