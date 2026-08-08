@@ -581,6 +581,11 @@ lang = LANGUAGES[selected_lang]
 # --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
 st.markdown("""
     <style>
+    /* 🔴 HIDDEN DEFAULT PAGE NAVIGATION 🔴 */
+    [data-testid="stSidebarNav"] {
+        display: none !important;
+    }
+
     html, body, [data-testid="stApp"], .stApp {
         background-color: #030712 !important;
         color: #f8fafc !important;
