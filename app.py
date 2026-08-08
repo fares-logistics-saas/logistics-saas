@@ -190,7 +190,7 @@ def init_db():
         if not result:
             hashed_pwd = make_hashes("password123")
             conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role, workspace, mfa_code, subscription_tier) VALUES (:u, :p, :r, :w, :m, :s)"),
-                         {"u": "admin", "p": hashed_pwd, "r": "Admin", "w": "Global Logistics Hub", "m": "1234", "s": "Enterprise"})
+                       {"u": "admin", "p": hashed_pwd, "r": "Admin", "w": "Global Logistics Hub", "m": "1234", "s": "Enterprise"})
 
 init_db()
 
@@ -353,7 +353,7 @@ def add_user(username, password, role="Auditor", workspace="Default Corp", mfa_c
     try:
         with engine.begin() as conn:
             conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role, workspace, mfa_code, subscription_tier, invoices_processed) VALUES (:u, :p, :r, :w, :m, 'Free', 0)"),
-                         {"u": username, "p": make_hashes(password), "r": role, "w": workspace, "m": mfa_code})
+                       {"u": username, "p": make_hashes(password), "r": role, "w": workspace, "m": mfa_code})
         st.cache_data.clear()
         return True
     except Exception:
@@ -608,7 +608,7 @@ st.markdown("""
     }
     .stApp {
         background-image: radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.18) 0%, transparent 45%),
-                          radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
+                         radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
     }
     h1, h2, h3, h4, h5, h6, p, span, label, div {
         color: #f8fafc !important;
@@ -946,6 +946,15 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
 
+# --- Moved Pricing, Privacy, Refund, and Terms to the VERY BOTTOM of the Sidebar ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📄 Legal & Pricing")
+legal_mode = st.sidebar.radio(
+    "Legal Pages", 
+    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
+    label_visibility="collapsed"
+)
+
 def extract_text_from_pdf(pdf_path):
     text = ""
     try:
@@ -1015,9 +1024,112 @@ def parse_invoice_with_ai(text, filename, currency):
     return data
 
 @st.fragment
-def render_active_view(mode):
+def render_active_view(mode, legal_choice):
     df_all = get_workspace_audits(st.session_state["workspace"])
     
+    # Handle Legal / Pricing pages selected from the bottom sidebar
+    if legal_choice == "Pricing":
+        st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
+        st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
+                <h2 style="color: white;">Free Tier</h2>
+                <h1 style="color: #60a5fa;">$0<span style="font-size: 14px; color: gray;">/mo</span></h1>
+                <p>Perfect for testing.</p>
+                <hr style="border-color: rgba(96, 165, 250, 0.3);">
+                <ul style="text-align: left; color: white;">
+                    <li>5 Invoice Scans Total</li>
+                    <li>Basic Dashboard</li>
+                    <li>Community Support</li>
+                </ul>
+            </div>
+            <br>
+            """, unsafe_allow_html=True)
+            if user_tier == "Free":
+                st.button("Current Plan", disabled=True, key="btn_free_pricing")
+                
+        with col2:
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
+                <h2 style="color: white;">Pro Tier 🚀</h2>
+                <h1 style="color: #60a5fa;">$150<span style="font-size: 14px; color: gray;">/mo</span></h1>
+                <p>For growing logistics firms.</p>
+                <hr style="border-color: rgba(96, 165, 250, 0.3);">
+                <ul style="text-align: left; color: white;">
+                    <li>50 Invoice Scans / month</li>
+                    <li>PDF Executive Reports</li>
+                    <li>Priority Email Alerts</li>
+                </ul>
+            </div>
+            <br>
+            """, unsafe_allow_html=True)
+            if user_tier == "Pro":
+                st.button("Current Plan", disabled=True, key="btn_pro_cur_pricing")
+            else:
+                checkout_url = create_paddle_checkout("Pro", PRO_PRICE_ID, st.session_state["username"])
+                if checkout_url:
+                    st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
+                else:
+                    st.warning("⚠️ Payment gateway currently unavailable.")
+
+        with col3:
+            st.markdown("""
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
+                <h2 style="color: white;">Enterprise</h2>
+                <h1 style="color: #60a5fa;">$500<span style="font-size: 14px; color: gray;">/mo</span></h1>
+                <p>For global shipping hubs.</p>
+                <hr style="border-color: rgba(96, 165, 250, 0.3);">
+                <ul style="text-align: left; color: white;">
+                    <li><b>Unlimited</b> Invoice Scans</li>
+                    <li>Full ERP Webhook Access</li>
+                    <li>24/7 Dedicated Account Rep</li>
+                </ul>
+            </div>
+            <br>
+            """, unsafe_allow_html=True)
+            if user_tier == "Enterprise":
+                st.button("Current Plan", disabled=True, key="btn_ent_cur_pricing")
+            else:
+                checkout_url_ent = create_paddle_checkout("Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"])
+                if checkout_url_ent:
+                    st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
+                else:
+                    st.warning("⚠️ Payment gateway currently unavailable.")
+        return
+
+    elif legal_choice == "Privacy Policy":
+        st.subheader("🔒 Privacy Policy")
+        st.write("""
+        **LogiAudit SaaS Engine** respects your privacy and is committed to protecting your corporate data.
+        * **Data Collection:** We securely process uploaded invoices, container tracking IDs, and audit records solely for supply chain auditing and financial verification.
+        * **Data Security:** All data is encrypted at rest and in transit using industry-standard protocols.
+        * **Third-Party Sharing:** We do not sell or share your business data with unauthorized third parties.
+        """)
+        return
+
+    elif legal_choice == "Refund Policy":
+        st.subheader("💵 Refund & Cancellation Policy")
+        st.write("""
+        * **Subscription Cancellation:** You can cancel your Pro or Enterprise subscription at any time from your billing dashboard. Cancellation takes effect at the end of the current billing cycle.
+        * **Refunds:** Due to the digital nature of SaaS invoice processing and API consumption, subscription fees are generally non-refundable. However, refund requests made within 48 hours of initial purchase due to technical incompatibilities will be reviewed on a case-by-case basis.
+        """)
+        return
+
+    elif legal_choice == "Terms of Service":
+        st.subheader("📜 Terms of Service")
+        st.write("""
+        By accessing and using **LogiAudit SaaS Engine**, you agree to the following terms:
+        * **Authorized Use:** You agree to use the platform solely for lawful enterprise logistics auditing and financial discrepancy detection.
+        * **Account Security:** You are responsible for maintaining the confidentiality of your login credentials and MFA codes.
+        * **Service Availability:** While we strive for 99.9% uptime, services may be subject to scheduled maintenance or unforeseen network interruptions.
+        """)
+        return
+
+    # Standard App Navigation Modes
     if mode == lang["nav_process"]:
         st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
         
@@ -1026,7 +1138,7 @@ def render_active_view(mode):
         
         if remaining <= 0:
             st.error(f"🛑 Usage Limit Reached! Your {user_tier} plan allows {limit} invoices max. Please upgrade your account to continue auditing.")
-            st.info("Navigate to 💼 Finance & Billing -> 💎 Billing & Subscriptions to upgrade.")
+            st.info("Navigate to the 'Pricing' tab at the bottom of the sidebar to upgrade.")
         else:
             st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
             
@@ -1078,17 +1190,17 @@ def render_active_view(mode):
                                         if sent:
                                             emails_sent_count += 1
                         
-                    if batch_results:
-                        increment_usage(st.session_state["username"], len(batch_results))
-                        st.toast('Batch Sensor Auditing Complete!', icon='🎯')
-                        st.success("✅ Audit Engine processing finished successfully with robust error checking.")
-                        
-                        if discrepancy_alerts_count > 0:
-                            st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
-                            if emails_sent_count > 0:
-                                st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
-                                
-                        st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
+                        if batch_results:
+                            increment_usage(st.session_state["username"], len(batch_results))
+                            st.toast('Batch Sensor Auditing Complete!', icon='🎯')
+                            st.success("✅ Audit Engine processing finished successfully with robust error checking.")
+                            
+                            if discrepancy_alerts_count > 0:
+                                st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
+                                if emails_sent_count > 0:
+                                    st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
+                                    
+                            st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
 
     elif mode == lang["nav_billing"]:
         st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
@@ -1137,7 +1249,7 @@ def render_active_view(mode):
                 if checkout_url:
                     st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
                 else:
-                    st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
+                    st.warning("⚠️ Payment gateway currently unavailable.")
 
         with col3:
             st.markdown("""
@@ -1161,7 +1273,7 @@ def render_active_view(mode):
                 if checkout_url_ent:
                     st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
                 else:
-                    st.warning("⚠️ Payment gateway currently unavailable. Please verify your secrets configuration.")
+                    st.warning("⚠️ Payment gateway currently unavailable.")
 
     elif mode == lang["nav_review"]:
         st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
@@ -1318,4 +1430,4 @@ def render_active_view(mode):
             log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
             st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
 
-render_active_view(app_mode)
+render_active_view(app_mode, legal_mode)
