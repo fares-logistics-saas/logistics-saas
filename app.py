@@ -26,13 +26,6 @@ import plotly.express as px
 
 st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout="wide", initial_sidebar_state="expanded")
 
-# --- Initialize View State ---
-if "view" not in st.session_state:
-    st.session_state["view"] = "app"
-
-def reset_view():
-    st.session_state["view"] = "app"
-
 # --- Paddle Live Settings (Secrets) ---
 try:
     PRO_PRICE_ID = st.secrets["paddle"]["PRO_PRICE_ID"]
@@ -366,6 +359,18 @@ def add_user(username, password, role="Auditor", workspace="Default Corp", mfa_c
     except Exception:
         return False
 
+def login_user(username, password, mfa_input):
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(sqlalchemy.text("SELECT password, role, workspace, mfa_code FROM users WHERE username = :u"), {"u": username.strip()}).fetchone()
+            if result:
+                stored_password, role, workspace, stored_mfa = result
+                if stored_password == make_hashes(password) and (not stored_mfa or mfa_input.strip() == stored_mfa or mfa_input.strip() == "1234"):
+                    return role, workspace
+    except Exception:
+        pass
+    return None, None
+
 def save_to_db(record, username, workspace):
     try:
         record_str = f"{record['Filename']}-{record['Tracking ID']}-{record['Container No']}-{record['Audit Status']}-{workspace}"
@@ -461,6 +466,16 @@ def generate_dispute_letter_pdf(filename, tracking_id, container_no, status):
     buffer.seek(0)
     return buffer
 
+query_params = st.query_params
+if "payment_success" in query_params and query_params.get("payment_success") == "true":
+    paid_plan = query_params.get("plan")
+    paid_user = query_params.get("user")
+    if paid_plan and paid_user:
+        upgrade_tier(paid_user, paid_plan)
+        st.success(f"🎉 Payment Successful! Account '{paid_user}' upgraded to {paid_plan} Tier.")
+        st.balloons()
+        st.query_params.clear()
+
 LANGUAGES = {
     "English": {
         "login_title": "🔐 Enterprise SSO & MFA Secure Login",
@@ -491,16 +506,6 @@ LANGUAGES = {
         "nav_vendor": "Vendor Risk Assessment",
         "nav_tariff": "AI Customs Tariff & HS Classifier",
         "nav_erp": "ERP & Webhook Integration",
-        
-        "landing_title": "Automated Logistics & Freight Auditing Engine",
-        "landing_desc": "LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.",
-        "landing_f1_title": "🤖 AI-Powered Extraction",
-        "landing_f1_desc": "Automatically extract tracking IDs, container numbers, and ocean freight costs from complex PDF invoices in seconds with zero manual data entry.",
-        "landing_f2_title": "💰 Financial Protection",
-        "landing_f2_desc": "Instantly flag discrepancies where billed amounts exceed your master service agreement (MSA) caps. Stop paying for errors and overcharges.",
-        "landing_f3_title": "⚖️ Automated Disputes",
-        "landing_f3_desc": "Generate legal-grade dispute notices instantly to request credit notes and chargebacks from vendors. Syncs seamlessly with CFO workflows.",
-        "landing_btn": "🚀 Enter Workspace Dashboard",
     },
     "العربية": {
         "login_title": "🔐 تسجيل الدخول الآمن للمؤسسات (SSO & MFA)",
@@ -531,21 +536,12 @@ LANGUAGES = {
         "nav_vendor": "تقييم مخاطر الموردين",
         "nav_tariff": "محلل الرسوم الجمركية والتصنيف الذكي (HS)",
         "nav_erp": "ربط أنظمة الـ ERP والـ Webhooks",
-        
-        "landing_title": "المحرك الآلي لتدقيق فواتير الشحن واللوجستيات",
-        "landing_desc": "LogiAudit هي منصة مؤسسية ذكية (SaaS) مصممة لإيقاف الهدر المالي في سلسلة التوريد الخاصة بك. باستخدام الذكاء الاصطناعي، نقوم بتدقيق فواتير الشحن، واكتشاف الرسوم الزائدة، وضمان التزام الموردين بالأسعار المتفق عليها.",
-        "landing_f1_title": "🤖 استخراج البيانات بالذكاء الاصطناعي",
-        "landing_f1_desc": "استخراج أرقام التتبع، والحاويات، وتكاليف الشحن من ملفات الـ PDF المعقدة في ثوانٍ وبدون أي تدخل يدوي.",
-        "landing_f2_title": "💰 الحماية المالية الذكية",
-        "landing_f2_desc": "اكتشاف التجاوزات المالية فوراً عندما تتخطى الفواتير سقف الأسعار المتفق عليه في عقودك. توقف عن الدفع مقابل الأخطاء.",
-        "landing_f3_title": "⚖️ النزاعات والمطالبات الآلية",
-        "landing_f3_desc": "إنشاء إشعارات نزاع قانونية تلقائياً للمطالبة باسترداد الأموال من الموردين، مرتبطة بسير عمل المدير المالي (CFO).",
-        "landing_btn": "🚀 الدخول إلى لوحة تحكم النظام",
     }
 }
 
-# --- اللوجو الشفاف المتمركز بدقة للقائمة الجانبية ---
+# --- Clickable Logo with Explanation Page Link ---
 logo_svg = """
+<a href="?view=about" target="_self" style="text-decoration: none; display: block;">
 <div class="custom-logo-container">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
   <defs>
@@ -558,6 +554,8 @@ logo_svg = """
       <stop offset="100%" stop-color="#059669" />
     </linearGradient>
   </defs>
+
+  <!-- Centered Larger Icon, Closer to Text -->
   <g transform="translate(118, -2) scale(0.72)">
     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
@@ -566,16 +564,14 @@ logo_svg = """
     <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
+
+  <!-- Centered Single Line Text, Closer to Logo -->
   <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
+</a>
 """
 st.sidebar.markdown(logo_svg, unsafe_allow_html=True)
-
-if st.sidebar.button("invisible_logo_btn", key="logo_btn"):
-    st.session_state["view"] = "landing"
-    st.rerun()
-
 st.sidebar.markdown("---")
 
 st.sidebar.markdown("🌐 **Language / اللغة**")
@@ -620,29 +616,19 @@ st.markdown("""
     
     .custom-logo-container {
         padding: 6px 8px;
+        border-radius: 12px;
         background: transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        margin-bottom: -0.5rem;
+        cursor: pointer;
+        border: 1px solid transparent;
         text-align: center;
     }
-    .custom-logo-container svg {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    [data-testid="stSidebar"] [data-testid="stButton"]:first-of-type {
-        margin-top: -75px !important;
-        margin-bottom: 0px !important;
-        position: relative !important;
-        z-index: 9999 !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stButton"]:first-of-type button {
-        height: 75px !important;
-        width: 100% !important;
-        opacity: 0 !important;
-        cursor: pointer !important;
-    }
-    
-    [data-testid="stSidebar"]:has([data-testid="stButton"]:first-of-type button:hover) .custom-logo-container svg {
-        filter: drop-shadow(0px 0px 14px rgba(59, 130, 246, 1));
-        transform: scale(1.03);
+    .custom-logo-container:hover {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        border-color: rgba(59, 130, 246, 0.3);
+        transform: translateY(-1px);
     }
 
     .stButton > button, 
@@ -756,83 +742,41 @@ st.markdown("""
         border-right: none !important;
         box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
     }
-    .landing-card {
-        background: rgba(15, 23, 42, 0.6); padding: 25px; border-radius: 12px; border: 1px solid rgba(59,130,246,0.2); height: 100%; transition: all 0.3s ease;
-    }
-    .landing-card:hover {
-        border-color: rgba(59, 130, 246, 0.6); transform: translateY(-5px); box-shadow: 0 10px 25px rgba(37, 99, 235, 0.2);
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- دالة عرض صفحة الشرح (Landing Page) ---
-def render_landing_page(lang_dict):
-    big_logo_svg = """
-    <div style="display: flex; justify-content: center; align-items: center; margin-top: 3rem; margin-bottom: 2rem;">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80" width="450" height="120">
-      <defs>
-        <linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#3b82f6" />
-          <stop offset="100%" stop-color="#1d4ed8" />
-        </linearGradient>
-        <linearGradient id="accentGradBig" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#10b981" />
-          <stop offset="100%" stop-color="#059669" />
-        </linearGradient>
-      </defs>
-      <g transform="translate(115, -12) scale(0.9)">
-        <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBig)" stroke-width="4" stroke-linejoin="round" />
-        <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBig)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-        <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-        <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-        <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-        <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      </g>
-      <text x="150" y="80" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-    </svg>
-    </div>
-    """
-    st.markdown(big_logo_svg, unsafe_allow_html=True)
+# --- Explanation Page Handler (Triggered when Logo is Clicked) ---
+if st.query_params.get("view") == "about":
+    st.title("📖 About LogiAudit SaaS Engine")
+    st.markdown("### Welcome to the Platform Overview")
+    st.write("""
+    **LogiAudit SaaS Engine** is an enterprise-grade, B2B logistics auditing and invoice intelligence platform built for global shipping hubs, freight forwarders, and corporate supply chain departments.
+    """)
     
-    st.markdown(f"""
-    <h1 style='text-align: center; color: #f8fafc; font-size: 2.5rem; margin-bottom: 1rem;'>{lang_dict['landing_title']}</h1>
-    <p style='text-align: center; font-size: 1.2rem; color: #94a3b8; max-width: 800px; margin: 0 auto 3rem auto; line-height: 1.6;'>
-    {lang_dict['landing_desc']}
-    </p>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
+    st.markdown("---")
+    col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"""
-        <div class="landing-card" style="border: 1px solid rgba(59,130,246,0.3);">
-            <h3 style="color: #3b82f6;">{lang_dict['landing_f1_title']}</h3>
-            <p style="color: #cbd5e1; font-size: 0.95rem;">{lang_dict['landing_f1_desc']}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("#### 🚀 Key Features & Capabilities")
+        st.markdown("""
+        * **Automated OCR & AI Sensor:** Instantly extracts tracking IDs, container numbers, ports, and fees from uploaded invoices (PDF/Images) with intelligent regex fallback.
+        * **Multi-Tier RBAC:** Secure role-based access control for Admins, CFOs, Auditors, and Viewers.
+        * **Enterprise Billing (Paddle):** Built-in subscription tiers (Free, Pro, Enterprise) with secure payment gateway integrations.
+        * **Dispute & Legal Automation:** Generates professional PDF formal financial dispute notices and chargeback requests.
+        * **IoT GPS & Live Tracking:** Syncs with carrier APIs (DHL, Aramex, Maersk) for real-time container satellite tracking.
+        """)
     with col2:
-        st.markdown(f"""
-        <div class="landing-card" style="border: 1px solid rgba(16,185,129,0.3);">
-            <h3 style="color: #10b981;">{lang_dict['landing_f2_title']}</h3>
-            <p style="color: #cbd5e1; font-size: 0.95rem;">{lang_dict['landing_f2_desc']}</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""
-        <div class="landing-card" style="border: 1px solid rgba(245,158,11,0.3);">
-            <h3 style="color: #f59e0b;">{lang_dict['landing_f3_title']}</h3>
-            <p style="color: #cbd5e1; font-size: 0.95rem;">{lang_dict['landing_f3_desc']}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("#### 💼 Business Value & Architecture")
+        st.markdown("""
+        * **Zero Latency & High Performance:** Optimized database caching and anti-flash UI themes for lightning-fast navigation.
+        * **Executive Reporting:** Generates immutable audit trails and executive PDF summary reports instantly.
+        * **Multi-Language Support:** Full localization for English and Arabic users.
+        * **Financial Leakage Protection:** Automatically flags freight and customs discrepancies to save thousands in overcharges.
+        """)
         
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        if st.button(lang_dict['landing_btn'], use_container_width=True, type="primary"):
-            st.session_state["view"] = "app"
-            st.rerun()
-
-if st.session_state["view"] == "landing":
-    render_landing_page(lang)
+    st.markdown("---")
+    if st.button("⬅️ Back to Logistics Engine", type="primary"):
+        st.query_params.clear()
+        st.rerun()
     st.stop()
 
 if "logged_in" not in st.session_state:
@@ -855,27 +799,25 @@ if not st.session_state["logged_in"]:
             
             if submit_login:
                 if l_user and l_pass:
-                    try:
+                    role, workspace = login_user(l_user, l_pass, l_mfa)
+                    if role:
+                        st.session_state["logged_in"] = True
+                        st.session_state["username"] = l_user.strip()
+                        st.session_state["role"] = role
+                        st.session_state["workspace"] = workspace
+                        
                         with engine.connect() as conn:
-                            result = conn.execute(sqlalchemy.text("SELECT password, role, workspace, mfa_code FROM users WHERE username = :u"), {"u": l_user.strip()}).fetchone()
-                            if result:
-                                stored_password, role, workspace, stored_mfa = result
-                                if stored_password == make_hashes(l_pass) and (not stored_mfa or l_mfa.strip() == stored_mfa or l_mfa.strip() == "1234"):
-                                    st.session_state["logged_in"] = True
-                                    st.session_state["username"] = l_user.strip()
-                                    st.session_state["role"] = role
-                                    st.session_state["workspace"] = workspace
-                                    
-                                    log_count = conn.execute(sqlalchemy.text("SELECT COUNT(*) FROM activity_logs WHERE username = :u AND action = 'USER_LOGIN'"), {"u": l_user.strip()}).scalar()
-                                    st.toast(f"Welcome back, {l_user.strip()}!" if log_count > 0 else f"Welcome, {l_user.strip()}!", icon="👋")
-                                    log_activity(l_user.strip(), workspace, "USER_LOGIN")
-                                    st.rerun()
-                                else:
-                                    st.error("Invalid Username, Password, or MFA Code.")
-                            else:
-                                st.error("Invalid Username, Password, or MFA Code.")
-                    except Exception as e:
-                        st.error(f"Auth System Down: {e}")
+                            log_count = conn.execute(sqlalchemy.text("SELECT COUNT(*) FROM activity_logs WHERE username = :u AND action = 'USER_LOGIN'"), {"u": l_user.strip()}).scalar()
+                        
+                        if log_count == 0:
+                            st.toast(f"Welcome, {l_user.strip()}!", icon="👋")
+                        else:
+                            st.toast(f"Welcome back, {l_user.strip()}!", icon="👋")
+                            
+                        log_activity(l_user.strip(), workspace, "USER_LOGIN")
+                        st.rerun()
+                    else:
+                        st.error("Invalid Username, Password, or MFA Code.")
                 else:
                     st.warning("Please fill in all required login fields.")
                 
@@ -921,18 +863,17 @@ st.sidebar.header("📂 Navigation Categories")
 category_choice = st.sidebar.selectbox(
     "Select Category",
     [lang["cat_ops"], lang["cat_fin"], lang["cat_rep"], lang["cat_sys"]],
-    label_visibility="collapsed",
-    on_change=reset_view
+    label_visibility="collapsed"
 )
 
 if category_choice == lang["cat_ops"]:
-    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]], on_change=reset_view)
+    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]])
 elif category_choice == lang["cat_fin"]:
-    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]], on_change=reset_view)
+    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]])
 elif category_choice == lang["cat_rep"]:
-    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]], on_change=reset_view)
+    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]])
 else:
-    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]], on_change=reset_view)
+    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]])
 
 st.sidebar.markdown("---")
 st.sidebar.header("🌍 Multi-Currency & Settings")
@@ -1074,17 +1015,17 @@ def render_active_view(mode):
                                         if sent:
                                             emails_sent_count += 1
                         
-                        if batch_results:
-                            increment_usage(st.session_state["username"], len(batch_results))
-                            st.toast('Batch Sensor Auditing Complete!', icon='🎯')
-                            st.success("✅ Audit Engine processing finished successfully with robust error checking.")
-                            
-                            if discrepancy_alerts_count > 0:
-                                st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
-                                if emails_sent_count > 0:
-                                    st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
-                                    
-                            st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
+                    if batch_results:
+                        increment_usage(st.session_state["username"], len(batch_results))
+                        st.toast('Batch Sensor Auditing Complete!', icon='🎯')
+                        st.success("✅ Audit Engine processing finished successfully with robust error checking.")
+                        
+                        if discrepancy_alerts_count > 0:
+                            st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
+                            if emails_sent_count > 0:
+                                st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
+                                
+                        st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
 
     elif mode == lang["nav_billing"]:
         st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
