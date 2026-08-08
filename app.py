@@ -617,18 +617,25 @@ st.markdown("""
     .custom-logo-container {
         padding: 6px 8px;
         border-radius: 12px;
-        background: transparent;
+        background: transparent !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         margin-bottom: -0.5rem;
         cursor: pointer;
-        border: 1px solid transparent;
+        border: 1px solid transparent !important;
         text-align: center;
+        box-shadow: none !important;
     }
     .custom-logo-container:hover {
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-        border-color: rgba(59, 130, 246, 0.3);
+        background: transparent !important;
+        box-shadow: none !important;
+        border-color: transparent !important;
         transform: translateY(-1px);
+    }
+    .custom-logo-container svg {
+        transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .custom-logo-container:hover svg {
+        filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
     }
 
     .about-logo-container {
@@ -652,7 +659,7 @@ st.markdown("""
         transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .about-logo-container:hover svg {
-        filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 5px rgba(16, 185, 129, 0.6));
+        filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.9)) drop-shadow(0 0 8px rgba(16, 185, 129, 0.7));
     }
 
     .stButton > button, 
