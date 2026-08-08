@@ -748,8 +748,8 @@ st.markdown("""
 # --- Explanation Page Handler (Triggered when Logo is Clicked) ---
 if st.query_params.get("view") == "about":
     st.markdown("""
-        <div style="text-align: center; padding: 1.5rem 1rem 0.5rem 1rem;">
-            <div style="max-width: 140px; margin: 0 auto 1.5rem auto;">
+        <div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
+            <div style="width: 480px; margin: 0 auto 2rem auto; display: block;">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
                   <defs>
                     <linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
