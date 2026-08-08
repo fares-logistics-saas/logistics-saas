@@ -565,8 +565,8 @@ logo_svg = """
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
 
-  <!-- Centered Single Line Text, Closer to Logo -->
-  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+  <!-- Centered Single Line Text matching exact clean style -->
+  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="700" fill="#f8fafc" text-anchor="middle">LogiAudit SaaS ENGINE</text>
 </svg>
 </div>
 </a>
@@ -799,7 +799,7 @@ if st.query_params.get("view") == "about":
 <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
 <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
 </g>
-<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#f8fafc" text-anchor="middle">LogiAudit SaaS ENGINE</text>
 </svg>
 </div>
 <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
