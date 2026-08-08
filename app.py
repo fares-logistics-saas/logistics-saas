@@ -749,8 +749,8 @@ st.markdown("""
 if st.query_params.get("view") == "about":
     st.markdown("""
         <div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
-            <div style="width: 480px; margin: 0 auto 2rem auto; display: block;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
+            <div style="width: 260px; margin: 0 auto 1.5rem auto; display: block;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 130" width="100%" height="100%">
                   <defs>
                     <linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stop-color="#3b82f6" />
@@ -761,7 +761,9 @@ if st.query_params.get("view") == "about":
                       <stop offset="100%" stop-color="#059669" />
                     </linearGradient>
                   </defs>
-                  <g transform="translate(118, -2) scale(0.72)">
+                  
+                  <!-- Cube Icon Stacked on Top -->
+                  <g transform="translate(60, 2) scale(1.1)">
                     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBig)" stroke-width="4" stroke-linejoin="round" />
                     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBig)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
                     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -769,7 +771,9 @@ if st.query_params.get("view") == "about":
                     <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
                     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
                   </g>
-                  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+                  
+                  <!-- Name Underneath the Icon -->
+                  <text x="100" y="116" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="10" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
                 </svg>
             </div>
             <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
