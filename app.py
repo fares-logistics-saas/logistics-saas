@@ -634,19 +634,25 @@ st.markdown("""
     .about-logo-container {
         width: 380px;
         margin: 0 auto 1.5rem auto;
-        padding: 16px;
-        border-radius: 16px;
-        background: transparent;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        padding: 10px;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
         cursor: pointer;
-        border: 1px solid transparent;
         display: block;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .about-logo-container:hover {
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.22) 0%, rgba(16, 185, 129, 0.22) 100%);
-        box-shadow: 0 0 30px rgba(59, 130, 246, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-        border-color: rgba(59, 130, 246, 0.4);
-        transform: translateY(-2px);
+        transform: scale(1.03);
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .about-logo-container svg {
+        transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .about-logo-container:hover svg {
+        filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 5px rgba(16, 185, 129, 0.6));
     }
 
     .stButton > button, 
