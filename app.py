@@ -946,7 +946,7 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
 
-# --- Moved Pricing, Privacy, Refund, and Terms to the VERY BOTTOM of the Sidebar ---
+# --- Legal & Pricing Section at the Very Bottom of the Sidebar ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📄 Legal & Pricing")
 legal_mode = st.sidebar.radio(
@@ -1027,7 +1027,7 @@ def parse_invoice_with_ai(text, filename, currency):
 def render_active_view(mode, legal_choice):
     df_all = get_workspace_audits(st.session_state["workspace"])
     
-    # Handle Legal / Pricing pages selected from the bottom sidebar
+    # Handle Legal & Pricing Pages Selected from Bottom Sidebar
     if legal_choice == "Pricing":
         st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
         st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
@@ -1103,7 +1103,7 @@ def render_active_view(mode, legal_choice):
 
     elif legal_choice == "Privacy Policy":
         st.subheader("🔒 Privacy Policy")
-        st.write("""
+        st.markdown("""
         **LogiAudit SaaS Engine** respects your privacy and is committed to protecting your corporate data.
         * **Data Collection:** We securely process uploaded invoices, container tracking IDs, and audit records solely for supply chain auditing and financial verification.
         * **Data Security:** All data is encrypted at rest and in transit using industry-standard protocols.
@@ -1113,7 +1113,7 @@ def render_active_view(mode, legal_choice):
 
     elif legal_choice == "Refund Policy":
         st.subheader("💵 Refund & Cancellation Policy")
-        st.write("""
+        st.markdown("""
         * **Subscription Cancellation:** You can cancel your Pro or Enterprise subscription at any time from your billing dashboard. Cancellation takes effect at the end of the current billing cycle.
         * **Refunds:** Due to the digital nature of SaaS invoice processing and API consumption, subscription fees are generally non-refundable. However, refund requests made within 48 hours of initial purchase due to technical incompatibilities will be reviewed on a case-by-case basis.
         """)
@@ -1121,7 +1121,7 @@ def render_active_view(mode, legal_choice):
 
     elif legal_choice == "Terms of Service":
         st.subheader("📜 Terms of Service")
-        st.write("""
+        st.markdown("""
         By accessing and using **LogiAudit SaaS Engine**, you agree to the following terms:
         * **Authorized Use:** You agree to use the platform solely for lawful enterprise logistics auditing and financial discrepancy detection.
         * **Account Security:** You are responsible for maintaining the confidentiality of your login credentials and MFA codes.
@@ -1129,7 +1129,7 @@ def render_active_view(mode, legal_choice):
         """)
         return
 
-    # Standard App Navigation Modes
+    # Standard App Navigation Modes (When 'App Dashboard' is selected)
     if mode == lang["nav_process"]:
         st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
         
@@ -1138,7 +1138,7 @@ def render_active_view(mode, legal_choice):
         
         if remaining <= 0:
             st.error(f"🛑 Usage Limit Reached! Your {user_tier} plan allows {limit} invoices max. Please upgrade your account to continue auditing.")
-            st.info("Navigate to the 'Pricing' tab at the bottom of the sidebar to upgrade.")
+            st.info("Navigate to the 'Pricing' option at the bottom of the sidebar to upgrade.")
         else:
             st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
             
