@@ -573,7 +573,7 @@ logo_html = f"""
                         <stop offset="100%" stop-color="#059669" />
                     </linearGradient>
                 </defs>
-                <g transform="translate(-15, -2) scale(1.15)">
+                <g transform="translate(10, -2) scale(1.15)">
                     <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBtn)" stroke-width="4" stroke-linejoin="round" />
                     <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBtn)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
                     <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
@@ -581,7 +581,7 @@ logo_html = f"""
                     <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
                     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBtn)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
                 </g>
-                <text x="95" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="18" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+                <text x="120" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="18" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
             </svg>
         </div>
     </div>
