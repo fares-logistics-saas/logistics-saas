@@ -29,12 +29,6 @@ st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout=
 # --- Initialize session state at the very top for robust session & view persistence ---
 if "view" not in st.session_state:
     st.session_state["view"] = "dashboard"
-    
-# Sync URL query param to session state for seamless HTML link toggling
-q_view = st.query_params.get("view")
-if q_view in ["about", "dashboard"]:
-    st.session_state["view"] = q_view
-    st.query_params.clear() # Clear URL visually to keep it clean
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -42,6 +36,13 @@ if "logged_in" not in st.session_state:
     st.session_state["role"] = ""
     st.session_state["workspace"] = ""
     st.session_state["legal_selection"] = "App Dashboard"
+
+if "return_mode" not in st.session_state:
+    st.session_state["return_mode"] = None
+if "return_category" not in st.session_state:
+    st.session_state["return_category"] = None
+if "restoring_dashboard" not in st.session_state:
+    st.session_state["restoring_dashboard"] = False
 
 # --- Paddle Live Settings (Secrets) ---
 try:
@@ -558,78 +559,16 @@ LANGUAGES = {
     }
 }
 
-# --- Interactive Sidebar Logo Button (Toggles between dashboard and explanation page instantly without reload) ---
-target_view = "dashboard" if st.session_state.get("view") == "about" else "about"
-
-logo_html = f"""
-<div id="sidebar-logo" style="text-decoration: none; display: block; margin-bottom: 1rem; cursor: pointer;">
-    <div class="custom-logo-container">
-        <div style="display: flex; align-items: center; justify-content: center;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="58">
-                <defs>
-                    <linearGradient id="primaryGradBtn" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#3b82f6" />
-                        <stop offset="100%" stop-color="#1d4ed8" />
-                    </linearGradient>
-                    <linearGradient id="accentGradBtn" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#10b981" />
-                        <stop offset="100%" stop-color="#059669" />
-                    </linearGradient>
-                </defs>
-                <g transform="translate(10, -2) scale(1.15)">
-                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBtn)" stroke-width="4" stroke-linejoin="round" />
-                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBtn)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-                    <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-                    <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-                    <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-                    <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBtn)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                </g>
-                <text x="120" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="18" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-            </svg>
-        </div>
-    </div>
-</div>
-<img src="dummy" style="display:none;" onerror="
-    setTimeout(() => {{
-        let logo = document.getElementById('sidebar-logo');
-        let btns = Array.from(document.querySelectorAll('.stButton button'));
-        let target = btns.find(b => b.innerText.includes('__HIDDEN_TOGGLE__'));
-        if (target) {{
-            let container = target.closest('[data-testid=\\'stElementContainer\\']');
-            if (container) container.style.display = 'none';
-            if (logo) {{
-                logo.onclick = () => target.click();
-            }}
-        }}
-    }}, 100);
-">
-"""
-st.sidebar.markdown(logo_html, unsafe_allow_html=True)
-if st.sidebar.button("__HIDDEN_TOGGLE__", key="hidden_logo_toggle"):
-    st.session_state["view"] = target_view
-    st.rerun()
-
-st.sidebar.markdown("---")
-
-st.sidebar.markdown("🌐 **Language / اللغة**")
-selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
-lang = LANGUAGES[selected_lang]
-
-# --- Legal & Pricing Section placed directly under Language Selection ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📄 Legal & Pricing")
-legal_mode = st.sidebar.radio(
-    "Legal Pages", 
-    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
-    label_visibility="collapsed",
-    key="legal_selection"
-)
-
 # --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
 st.markdown("""
     <style>
-    /* 🔴 HIDDEN DEFAULT PAGE NAVIGATION 🔴 */
+    /* 🔴 HIDDEN DEFAULT PAGE NAVIGATION & HIDDEN OVERLAY BUTTON CONTAINER 🔴 */
     [data-testid="stSidebarNav"] {
+        display: none !important;
+    }
+
+    /* Completely hide the toggle button container so it's 100% invisible */
+    div.stButton:has(button[key="logo_click_trigger"]) {
         display: none !important;
     }
 
@@ -824,6 +763,102 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- Helper function for category & radio key mapping ---
+def get_category_and_radio_key(mode_name, lang_dict):
+    ops_list = [lang_dict["nav_process"], lang_dict["nav_review"], lang_dict["nav_iot"]]
+    fin_list = [lang_dict["nav_billing"], lang_dict["nav_dispute"], lang_dict["nav_workflow"]]
+    rep_list = [lang_dict["nav_kpi"], lang_dict["nav_alerts"], lang_dict["nav_history"], lang_dict["nav_scheduler"]]
+    sys_list = [lang_dict["nav_voice"], "Vendor Risk Assessment", lang_dict["nav_tariff"], lang_dict["nav_erp"]]
+    
+    if mode_name in ops_list:
+        return lang_dict["cat_ops"], "radio_ops"
+    elif mode_name in fin_list:
+        return lang_dict["cat_fin"], "radio_fin"
+    elif mode_name in rep_list:
+        return lang_dict["cat_rep"], "radio_rep"
+    elif mode_name in sys_list:
+        return lang_dict["cat_sys"], "radio_sys"
+    return lang_dict["cat_ops"], "radio_ops"
+
+# --- Sidebar Logo & Click Trigger Setup ---
+logo_html = f"""
+<div style="text-decoration: none; display: block; margin-bottom: 1rem;">
+    <div class="custom-logo-container">
+        <div style="display: flex; align-items: center; justify-content: center;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="58">
+                <defs>
+                    <linearGradient id="primaryGradBtn" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#3b82f6" />
+                        <stop offset="100%" stop-color="#1d4ed8" />
+                    </linearGradient>
+                    <linearGradient id="accentGradBtn" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#10b981" />
+                        <stop offset="100%" stop-color="#059669" />
+                    </linearGradient>
+                </defs>
+                <g transform="translate(10, -2) scale(1.15)">
+                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBtn)" stroke-width="4" stroke-linejoin="round" />
+                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBtn)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
+                    <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+                    <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+                    <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
+                    <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBtn)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                </g>
+                <text x="120" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="18" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+            </svg>
+        </div>
+    </div>
+</div>
+"""
+st.sidebar.markdown(logo_html, unsafe_allow_html=True)
+
+# Hidden button linked to logo click handling
+if st.sidebar.button("Toggle Logo", key="logo_click_trigger"):
+    if st.session_state["view"] == "dashboard":
+        # Save current active page mode before going to about
+        current_mode = st.session_state.get("radio_ops") or st.session_state.get("radio_fin") or st.session_state.get("radio_rep") or st.session_state.get("radio_sys")
+        st.session_state["return_mode"] = current_mode
+        if current_mode:
+            # Determine category based on current language
+            lang_temp = LANGUAGES.get(st.session_state.get("selected_lang", "English"), LANGUAGES["English"])
+            cat, _ = get_category_and_radio_key(current_mode, lang_temp)
+            st.session_state["return_category"] = cat
+        st.session_state["view"] = "about"
+    else:
+        st.session_state["view"] = "dashboard"
+        st.session_state["restoring_dashboard"] = True
+    st.rerun()
+
+# JS snippet to make the SVG logo container clickable and trigger the hidden button instantly
+logo_click_js = """
+<img src="dummy" style="display:none;" onerror="
+    setTimeout(() => {
+        let logoContainer = document.querySelector('.custom-logo-container');
+        let hiddenBtn = document.querySelector('button[key=\\'logo_click_trigger\\']') || Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Toggle Logo'));
+        if (logoContainer && hiddenBtn) {
+            logoContainer.style.cursor = 'pointer';
+            logoContainer.onclick = () => hiddenBtn.click();
+        }
+    }, 150);
+">
+"""
+st.sidebar.markdown(logo_click_js, unsafe_allow_html=True)
+st.sidebar.markdown("---")
+
+st.sidebar.markdown("🌐 **Language / اللغة**")
+selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed", key="selected_lang")
+lang = LANGUAGES[selected_lang]
+
+# --- Legal & Pricing Section placed directly under Language Selection ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📄 Legal & Pricing")
+legal_mode = st.sidebar.radio(
+    "Legal Pages", 
+    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
+    label_visibility="collapsed",
+    key="legal_selection"
+)
+
 # --- Explanation Page View Handler ---
 if st.session_state["view"] == "about":
     st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
@@ -850,16 +885,6 @@ if st.session_state["view"] == "about":
 <text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
-<img src="dummy" style="display:none;" onerror="
-    setTimeout(() => {
-        let aboutLogo = document.getElementById('about-main-logo');
-        let btns = Array.from(document.querySelectorAll('.stButton button'));
-        let enterBtn = btns.find(b => b.innerText.includes('Enter Workspace Dashboard'));
-        if (aboutLogo && enterBtn) {
-            aboutLogo.onclick = () => enterBtn.click();
-        }
-    }, 100);
-">
 <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
 <p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin: 0 auto 3rem auto; line-height: 1.6;">
 LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.
@@ -904,8 +929,22 @@ LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakag
     with col_btn2:
         if st.button("🚀 Enter Workspace Dashboard", use_container_width=True, type="primary"):
             st.session_state["view"] = "dashboard"
+            st.session_state["restoring_dashboard"] = True
             st.rerun()
     st.stop()
+
+# --- Handle Restoring Previous Page State ---
+if st.session_state.get("restoring_dashboard", False):
+    ret_mode = st.session_state.get("return_mode")
+    ret_cat = st.session_state.get("return_category")
+    if ret_mode and ret_cat:
+        st.session_state["main_cat_choice"] = ret_cat
+        _, r_key = get_category_and_radio_key(ret_mode, lang)
+        st.session_state[r_key] = ret_mode
+    else:
+        st.session_state["main_cat_choice"] = lang["cat_ops"]
+        st.session_state["radio_ops"] = lang["nav_process"]
+    st.session_state["restoring_dashboard"] = False
 
 # --- Callback function to reset the Legal/Pricing menu automatically ---
 def reset_legal_view():
