@@ -797,7 +797,7 @@ if st.query_params.get("view") == "about":
 <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
 <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
 </g>
-<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
@@ -1034,59 +1034,108 @@ def render_active_view(mode, legal_choice):
     
     # Handle Legal & Pricing Pages Selected from Bottom Sidebar
     if legal_choice == "Pricing":
-        st.subheader("🏷️ Pricing Plans & Feature Tiers")
-        st.write("Review our transparent pricing tiers designed for logistics teams of all sizes.")
+        st.subheader("🏷️ Pricing Rationale & Value Breakdown")
+        st.write("Understand how LogiAudit saves your business money, why our pricing tiers are structured the way they are, and why Enterprise is the ultimate choice for logistics leaders.")
         st.markdown("---")
+        
+        st.markdown("### 💡 Why Our Pricing is Built for High ROI")
+        st.markdown("""
+        Unchecked logistics invoices contain an average of **3% to 8% in billing errors, duplicate line items, and overcharges**.
+        Catching just **one** ocean freight overcharge (typically $450 - $1,200 per container) completely pays for months of your subscription.
+        """)
         
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
-                <h2 style="color: white;">Free Tier</h2>
-                <h1 style="color: #60a5fa;">$0<span style="font-size: 14px; color: gray;">/mo</span></h1>
-                <p>Perfect for testing.</p>
-                <hr style="border-color: rgba(96, 165, 250, 0.3);">
-                <ul style="text-align: left; color: white;">
-                    <li>5 Invoice Scans Total</li>
-                    <li>Basic Dashboard</li>
-                    <li>Community Support</li>
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <h3 style="color: #60a5fa; margin-top: 0;">Free Tier</h3>
+                <h2 style="color: white;">$0 <span style="font-size: 14px; color: gray;">/month</span></h2>
+                <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Zero-risk evaluation sandbox.</p>
+                <hr style="border-color: rgba(255, 255, 255, 0.1);">
+                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
+                <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
+                    <li>Test OCR extraction accuracy on your real PDF invoices.</li>
+                    <li>Verify container number & tracking ID detection.</li>
+                    <li>Experience instant automated audit checks with zero financial commitment.</li>
                 </ul>
             </div>
             """, unsafe_allow_html=True)
             
         with col2:
             st.markdown("""
-            <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
-                <h2 style="color: white;">Pro Tier 🚀</h2>
-                <h1 style="color: #60a5fa;">$150<span style="font-size: 14px; color: gray;">/mo</span></h1>
-                <p>For growing logistics firms.</p>
-                <hr style="border-color: rgba(96, 165, 250, 0.3);">
-                <ul style="text-align: left; color: white;">
-                    <li>50 Invoice Scans / month</li>
-                    <li>PDF Executive Reports</li>
-                    <li>Priority Email Alerts</li>
-                    <li>Basic ERP Integrations</li>
+            <div style="background: rgba(15, 23, 42, 0.7); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(37, 99, 235, 0.4);">
+                <h3 style="color: #3b82f6; margin-top: 0;">Pro Tier 🚀</h3>
+                <h2 style="color: white;">$150 <span style="font-size: 14px; color: gray;">/month</span></h2>
+                <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Financial protection for growing firms.</p>
+                <hr style="border-color: rgba(255, 255, 255, 0.1);">
+                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>Why $150/month?</b></p>
+                <p style="color: #cbd5e1; font-size: 0.85rem;">At just $3 per audited invoice, stopping a single $450 discrepancy yields a 300%+ ROI in your first week.</p>
+                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
+                <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
+                    <li>Process up to 50 invoices/month.</li>
+                    <li>Instant email notifications sent to auditors when rate limits are breached.</li>
+                    <li>Download legal dispute notices and executive PDF reports.</li>
                 </ul>
             </div>
             """, unsafe_allow_html=True)
 
         with col3:
             st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
-                <h2 style="color: white;">Enterprise</h2>
-                <h1 style="color: #60a5fa;">$500<span style="font-size: 14px; color: gray;">/mo</span></h1>
-                <p>For global shipping hubs.</p>
-                <hr style="border-color: rgba(96, 165, 250, 0.3);">
-                <ul style="text-align: left; color: white;">
-                    <li><b>Unlimited</b> Invoice Scans</li>
-                    <li>Full ERP Webhook Access</li>
-                    <li>24/7 Dedicated Account Rep</li>
-                    <li>Custom SLA Agreements</li>
+            <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(16, 185, 129, 0.5); box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);">
+                <h3 style="color: #10b981; margin-top: 0;">Enterprise Tier 💎</h3>
+                <h2 style="color: white;">$500 <span style="font-size: 14px; color: gray;">/month</span></h2>
+                <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Complete enterprise supply chain automation.</p>
+                <hr style="border-color: rgba(255, 255, 255, 0.1);">
+                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>Why $500/month?</b></p>
+                <p style="color: #cbd5e1; font-size: 0.85rem;">Replaces manual data entry teams with automated real-time ERP webhooks and unlimited batch scanning.</p>
+                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
+                <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
+                    <li><b>Unlimited Invoices</b> — zero cap on monthly audits.</li>
+                    <li>Direct ERP Webhook & API integration (SAP, Oracle, NetSuite).</li>
+                    <li>Dedicated account representative & 24/7 priority SLA.</li>
                 </ul>
             </div>
             """, unsafe_allow_html=True)
-            
-        st.info("💡 To upgrade or manage your subscription securely via Paddle, please visit **Billing & Subscriptions** under the **Finance & Billing** menu in the operations navigation above.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("### ⚡ Pro vs. Enterprise: Why Enterprise is Superior")
+        
+        comp_df = pd.DataFrame({
+            "Capability / Feature": [
+                "Monthly Invoice Volume Cap",
+                "Cost per Audited Document",
+                "ERP & Webhook Auto-Sync",
+                "CFO Digital Approval Queue",
+                "Contract Rate Customization",
+                "Support & Service Level Agreement (SLA)",
+                "Dedicated Account Rep"
+            ],
+            "Pro Tier ($150/mo)": [
+                "50 Invoices / month",
+                "$3.00 per invoice",
+                "❌ Manual CSV/PDF Export Only",
+                "Standard Queue",
+                "Standard Benchmark Caps",
+                "Standard Email Support (24h response)",
+                "❌ Not Included"
+            ],
+            "Enterprise Tier ($500/mo) 💎": [
+                "♾️ Unlimited (Zero Limit)",
+                "Near $0.00 per invoice at volume",
+                "✅ Live Real-Time Webhooks & ERP Pipeline",
+                "Advanced CFO Sign-off Workflow",
+                "✅ Fully Custom MSA Rate Matrix & Rules",
+                "24/7 Priority SLA Response",
+                "✅ Dedicated Account Manager"
+            ]
+        })
+        st.table(comp_df)
+        
+        st.markdown("""
+        > **Bottom Line:** While **Pro** is ideal for small teams uploading invoices manually, **Enterprise** transforms your logistics finance department by seamlessly connecting to your existing ERP, scaling without volume limits, and fully automating dispute generation.
+        
+        💡 *To upgrade or manage your subscription, switch to **Billing & Subscriptions** under the **Finance & Billing** menu above.*
+        """)
         return
 
     elif legal_choice == "Privacy Policy":
