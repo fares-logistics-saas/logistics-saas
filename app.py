@@ -564,14 +564,14 @@ logo_html = f"""
         <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="28" height="28">
                 <g transform="translate(10, 5) scale(0.9)">
-                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="#93c5fd" stroke-width="6" stroke-linejoin="round" />
-                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="#93c5fd" stroke-width="4" stroke-linejoin="round" opacity="0.6" />
+                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="#3b82f6" stroke-width="6" stroke-linejoin="round" />
+                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="#3b82f6" stroke-width="4" stroke-linejoin="round" opacity="0.6" />
                     <circle cx="65" cy="65" r="24" fill="#030712" stroke="#10b981" stroke-width="5" />
                     <path d="M53 65 L60 72 L76 55" fill="none" stroke="#10b981" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
                 </g>
             </svg>
             <span style="font-family: system-ui, -apple-system, sans-serif; font-size: 16px; font-weight: 800; color: #f8fafc; letter-spacing: 0.1px;">
-                Logi<span style="color: #93c5fd;">Audit</span> <span style="font-size: 11px; font-weight: 600; color: #e2e8f0;">SaaS ENGINE</span>
+                Logi<span style="color: #3b82f6;">Audit</span> <span style="font-size: 11px; font-weight: 500; color: #94a3b8;">SaaS ENGINE</span>
             </span>
         </div>
     </div>
