@@ -481,8 +481,9 @@ LANGUAGES = {
         "login_title": "🔐 Enterprise SSO & MFA Secure Login",
         "login_sub": "Corporate Login with Multi-Factor Authentication",
         "reg_sub": "Create a new corporate account",
-        "main_title": "📦 Logistics Invoice Auditor & Database Engine",
-        "main_desc": "Upload multiple logistics invoices for automated high-speed batch processing, strict contract auditing, and secure enterprise database logging.",
+        
+        "main_title": "Automated Logistics & Freight Auditing Engine",
+        "main_desc": "LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.",
         
         "cat_ops": "📥 Core Operations / العمليات الأساسية",
         "cat_fin": "💼 Finance & Billing / المالية والفوترة",
@@ -511,8 +512,9 @@ LANGUAGES = {
         "login_title": "🔐 تسجيل الدخول الآمن للمؤسسات (SSO & MFA)",
         "login_sub": "تسجيل الدخول المؤسسي مع المصادقة الثنائية",
         "reg_sub": "إنشاء حساب مؤسسي جديد",
-        "main_title": "📦 محرك تدقيق فواتير الشحن وقاعدة البيانات",
-        "main_desc": "قم برفع فواتير الشحن المتعددة للمعالجة الآلية السريعة، التدقيق الصارم، وحفظ السجلات في قاعدة البيانات السحابية.",
+        
+        "main_title": "محرك التدقيق الآلي للخدمات اللوجستية والشحن",
+        "main_desc": "LogiAudit هي منصة SaaS على مستوى المؤسسات مصممة لوقف التسرب المالي في سلسلة التوريد الخاصة بك. من خلال الاستفادة من التعرف البصري على الحروف (OCR) المدعوم بالذكاء الاصطناعي والمطابقة الذكية، نقوم تلقائيًا بتدقيق فواتير الشحن الخاصة بك، واكتشاف الرسوم الزائدة، وضمان الامتثال لأسعارك المتعاقد عليها.",
         
         "cat_ops": "📥 العمليات الأساسية",
         "cat_fin": "💼 الإدارة المالية والفوترة",
@@ -539,7 +541,7 @@ LANGUAGES = {
     }
 }
 
-# --- Clickable Logo with Explanation Page Link & Matching Typography ---
+# --- Clickable Logo with Explanation Page Link ---
 logo_svg = """
 <a href="?view=about" target="_self" style="text-decoration: none; display: block;">
 <div class="custom-logo-container">
@@ -565,8 +567,8 @@ logo_svg = """
     <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
   </g>
 
-  <!-- Centered Single Line Text with Exact Styling Match -->
-  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="10" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+  <!-- Centered Single Line Text, Closer to Logo -->
+  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 </a>
@@ -924,8 +926,15 @@ if st.sidebar.button("Log out"):
     st.session_state["username"] = ""
     st.rerun()
 
-st.title(lang["main_title"])
-st.write(lang["main_desc"])
+# --- Beautifully Styled Custom Main Headers Matching About Page ---
+st.markdown(f"""
+<div>
+    <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">{lang['main_title']}</h1>
+    <p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin-bottom: 2rem; line-height: 1.6;">
+        {lang['main_desc']}
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # --- Callback function to reset the Legal/Pricing menu automatically ---
 def reset_legal_view():
