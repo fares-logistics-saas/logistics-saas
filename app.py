@@ -29,12 +29,6 @@ st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout=
 # --- Initialize session state at the very top for robust session & view persistence ---
 if "view" not in st.session_state:
     st.session_state["view"] = "dashboard"
-    
-# Sync URL query param to session state for seamless HTML link toggling
-q_view = st.query_params.get("view")
-if q_view in ["about", "dashboard"]:
-    st.session_state["view"] = q_view
-    st.query_params.clear() # Clear URL visually to keep it clean
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -558,10 +552,10 @@ LANGUAGES = {
     }
 }
 
-# --- Interactive Sidebar Logo Button (Toggles between dashboard and explanation page instantly) ---
-target_view = "dashboard" if st.session_state.get("view") == "about" else "about"
+# --- Interactive Sidebar Logo Button ---
+# Replaced HTML link with standard Streamlit button navigation to prevent browser refresh & logout
 logo_html = f"""
-<a href="?view={target_view}" target="_self" style="text-decoration: none; display: block; margin-bottom: 1rem;">
+<div style="text-decoration: none; display: block; margin-bottom: 0.5rem;">
     <div class="custom-logo-container">
         <div style="display: flex; align-items: center; justify-content: center;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="58">
@@ -587,9 +581,19 @@ logo_html = f"""
             </svg>
         </div>
     </div>
-</a>
+</div>
 """
 st.sidebar.markdown(logo_html, unsafe_allow_html=True)
+
+if st.session_state["view"] == "about":
+    if st.sidebar.button("⬅️ Return to Dashboard", use_container_width=True):
+        st.session_state["view"] = "dashboard"
+        st.rerun()
+else:
+    if st.sidebar.button("📖 About LogiAudit", use_container_width=True):
+        st.session_state["view"] = "about"
+        st.rerun()
+        
 st.sidebar.markdown("---")
 
 st.sidebar.markdown("🌐 **Language / اللغة**")
@@ -656,15 +660,9 @@ st.markdown("""
         border: none;
         padding: 14px 16px;
         box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         text-align: center;
-        cursor: pointer;
         margin-bottom: -0.5rem;
-    }
-    .custom-logo-container:hover {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-        transform: translateY(-1px);
+        cursor: default;
     }
 
     .about-logo-container {
@@ -674,23 +672,10 @@ st.markdown("""
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        cursor: pointer;
         display: block;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: default;
     }
-    .about-logo-container:hover {
-        transform: scale(1.03);
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-    .about-logo-container svg {
-        transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .about-logo-container:hover svg {
-        filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 5px rgba(16, 185, 129, 0.6));
-    }
-
+    
     .stButton > button, 
     [data-testid="baseButton-primary"], 
     [data-testid="baseButton-secondary"],
