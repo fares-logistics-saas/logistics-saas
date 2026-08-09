@@ -793,11 +793,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Navigation and Sidebar Setup for Public & Legal Views ---
-st.sidebar.markdown("---")
-st.sidebar.header("📂 Navigation Categories")
-
-# --- Legal & Pricing Section at the Very Bottom of the Sidebar ---
+# --- Sidebar Layout: Legal & Pricing First (For Paddle Reviewers), then Navigation Categories ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📄 Legal & Pricing")
 legal_mode = st.sidebar.radio(
@@ -809,6 +805,9 @@ legal_mode = st.sidebar.radio(
 
 def reset_legal_view():
     st.session_state["legal_selection"] = "App Dashboard"
+
+st.sidebar.markdown("---")
+st.sidebar.header("📂 Navigation Categories")
 
 category_choice = st.sidebar.selectbox(
     "Select Category",
@@ -907,7 +906,7 @@ def parse_invoice_with_ai(text, filename, currency):
 def render_active_view(mode, legal_choice):
     df_all = get_workspace_audits(st.session_state["workspace"]) if st.session_state["logged_in"] else pd.DataFrame()
     
-    # Handle Legal & Pricing Pages Selected from Bottom Sidebar (Accessible Publicly for Paddle Reviewers)
+    # Handle Legal & Pricing Pages Selected from Sidebar
     if legal_choice == "Pricing":
         st.subheader("🏷️ Pricing Rationale & Value Breakdown")
         st.write("Understand how LogiAudit saves your business money, why our pricing tiers are structured the way they are, and why Enterprise is the ultimate choice for logistics leaders.")
