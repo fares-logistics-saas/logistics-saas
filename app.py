@@ -793,158 +793,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Explanation Page View Handler ---
-if st.session_state["view"] == "about":
-    st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
-<div class="about-logo-container">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
-<defs>
-<linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
-<stop offset="0%" stop-color="#3b82f6" />
-<stop offset="100%" stop-color="#1d4ed8" />
-</linearGradient>
-<linearGradient id="accentGradBig" x1="0%" y1="0%" x2="100%" y2="0%">
-<stop offset="0%" stop-color="#10b981" />
-<stop offset="100%" stop-color="#059669" />
-</linearGradient>
-</defs>
-<g transform="translate(120, 4) scale(1.05)">
-<path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBig)" stroke-width="4" stroke-linejoin="round" />
-<path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBig)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-<line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-<line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-<circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-<path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-</g>
-<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-</svg>
-</div>
-<h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
-<p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin: 0 auto 3rem auto; line-height: 1.6;">
-LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.
-</p>
-</div>""", unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">🤖 AI-Powered Extraction</h3>
-                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
-                    Automatically extract tracking IDs, container numbers, and ocean freight costs from complex PDF invoices in seconds with zero manual data entry.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with col2:
-        st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">💰 Financial Protection</h3>
-                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
-                    Instantly flag discrepancies where billed amounts exceed your master service agreement (MSA) caps. Stop paying for errors and overcharges.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with col3:
-        st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">⚖️ Automated Disputes</h3>
-                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
-                    Generate legal-grade dispute notices instantly to request credit notes and chargebacks from vendors. Syncs seamlessly with CFO workflows.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-    with col_btn2:
-        if st.button("🚀 Enter Workspace Dashboard", use_container_width=True, type="primary"):
-            st.session_state["view"] = "dashboard"
-            st.rerun()
-    st.stop()
-
-# --- Authentication Check ---
-if not st.session_state["logged_in"]:
-    st.title(lang["login_title"])
-    
-    tab1, tab2 = st.tabs(["Login", "Register New Account"])
-    with tab1:
-        st.subheader(lang["login_sub"])
-        with st.form("login_form"):
-            l_user = st.text_input("Username")
-            l_pass = st.text_input("Password", type="password")
-            l_mfa = st.text_input("MFA Security Code (Default: 1234)", value="1234")
-            submit_login = st.form_submit_button("Sign In Securely", type="primary")
-            
-            if submit_login:
-                if l_user and l_pass:
-                    role, workspace = login_user(l_user, l_pass, l_mfa)
-                    if role:
-                        st.session_state["logged_in"] = True
-                        st.session_state["username"] = l_user.strip()
-                        st.session_state["role"] = role
-                        st.session_state["workspace"] = workspace
-                        
-                        with engine.connect() as conn:
-                            log_count = conn.execute(sqlalchemy.text("SELECT COUNT(*) FROM activity_logs WHERE username = :u AND action = 'USER_LOGIN'"), {"u": l_user.strip()}).scalar()
-                        
-                        if log_count == 0:
-                            st.toast(f"Welcome, {l_user.strip()}!", icon="👋")
-                        else:
-                            st.toast(f"Welcome back, {l_user.strip()}!", icon="👋")
-                            
-                        log_activity(l_user.strip(), workspace, "USER_LOGIN")
-                        st.rerun()
-                    else:
-                        st.error("Invalid Username, Password, or MFA Code.")
-                else:
-                    st.warning("Please fill in all required login fields.")
-                
-    with tab2:
-        st.subheader(lang["reg_sub"])
-        with st.form("register_form"):
-            r_user = st.text_input("Choose Username")
-            r_pass = st.text_input("Choose Password", type="password")
-            r_role = st.selectbox("Account Role", ["Auditor", "Admin", "CFO", "Viewer"])
-            r_workspace = st.text_input("Corporate Workspace Name", value="Global Logistics Hub")
-            r_mfa = st.text_input("Set 4-digit MFA Code", value="1234")
-            submit_reg = st.form_submit_button("Create Free Account")
-            
-            if submit_reg:
-                if r_user and r_pass and r_workspace:
-                    success = add_user(r_user.strip(), r_pass, r_role, r_workspace.strip(), r_mfa.strip())
-                    if success:
-                        log_activity(r_user.strip(), r_workspace.strip(), "USER_REGISTER")
-                        st.toast("Free Account created successfully! Switch to Login.", icon="✅")
-                    else:
-                        st.error("Username already exists.")
-                else:
-                    st.warning("Please fill in all fields.")
-    st.stop()
-
-user_tier, invoices_processed = get_user_sub_info(st.session_state["username"])
-
-st.sidebar.write(f"👤 User: **{st.session_state['username']}**")
-st.sidebar.write(f"🏢 Workspace: **{st.session_state['workspace']}**")
-st.sidebar.write(f"💎 Plan: **{user_tier}** ({invoices_processed}/{PLAN_LIMITS[user_tier]} used)")
-if st.sidebar.button("Log out"):
-    log_activity(st.session_state["username"], st.session_state["workspace"], "USER_LOGOUT")
-    st.session_state["logged_in"] = False
-    st.session_state["username"] = ""
-    st.rerun()
-
-st.title(lang["main_title"])
-st.write(lang["main_desc"])
-
-# --- Callback function to reset the Legal/Pricing menu automatically ---
-def reset_legal_view():
-    st.session_state["legal_selection"] = "App Dashboard"
-
+# --- Navigation and Sidebar Setup for Public & Legal Views ---
 st.sidebar.markdown("---")
 st.sidebar.header("📂 Navigation Categories")
+
+# --- Legal & Pricing Section at the Very Bottom of the Sidebar ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📄 Legal & Pricing")
+legal_mode = st.sidebar.radio(
+    "Legal Pages", 
+    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
+    label_visibility="collapsed",
+    key="legal_selection"
+)
+
+def reset_legal_view():
+    st.session_state["legal_selection"] = "App Dashboard"
 
 category_choice = st.sidebar.selectbox(
     "Select Category",
@@ -970,16 +834,6 @@ min_ocean_freight = st.sidebar.number_input("Min Allowed Ocean Freight", value=7
 max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3000.0)
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
-
-# --- Legal & Pricing Section at the Very Bottom of the Sidebar ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📄 Legal & Pricing")
-legal_mode = st.sidebar.radio(
-    "Legal Pages", 
-    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
-    label_visibility="collapsed",
-    key="legal_selection"
-)
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -1051,9 +905,9 @@ def parse_invoice_with_ai(text, filename, currency):
 
 @st.fragment
 def render_active_view(mode, legal_choice):
-    df_all = get_workspace_audits(st.session_state["workspace"])
+    df_all = get_workspace_audits(st.session_state["workspace"]) if st.session_state["logged_in"] else pd.DataFrame()
     
-    # Handle Legal & Pricing Pages Selected from Bottom Sidebar
+    # Handle Legal & Pricing Pages Selected from Bottom Sidebar (Accessible Publicly for Paddle Reviewers)
     if legal_choice == "Pricing":
         st.subheader("🏷️ Pricing Rationale & Value Breakdown")
         st.write("Understand how LogiAudit saves your business money, why our pricing tiers are structured the way they are, and why Enterprise is the ultimate choice for logistics leaders.")
@@ -1151,12 +1005,6 @@ def render_active_view(mode, legal_choice):
             ]
         })
         st.table(comp_df)
-        
-        st.markdown("""
-        > **Bottom Line:** While **Pro** is ideal for small teams uploading invoices manually, **Enterprise** transforms your logistics finance department by seamlessly connecting to your existing ERP, scaling without volume limits, and fully automating dispute generation.
-        
-        💡 *To upgrade or manage your subscription, switch to **Billing & Subscriptions** under the **Finance & Billing** menu above.*
-        """)
         return
 
     elif legal_choice == "Privacy Policy":
@@ -1187,7 +1035,72 @@ def render_active_view(mode, legal_choice):
         """)
         return
 
-    # Standard App Navigation Modes (When 'App Dashboard' is selected)
+    # --- Authentication Gate for App Dashboard & Features ---
+    if not st.session_state["logged_in"]:
+        st.title(lang["login_title"])
+        st.info("💡 **Notice for Paddle Compliance Reviewers:** You are viewing the secure enterprise portal login screen. To examine public pricing, terms, and privacy policies, please use the sidebar menu under **Legal & Pricing**.")
+        
+        tab1, tab2 = st.tabs(["Login", "Register New Account"])
+        with tab1:
+            st.subheader(lang["login_sub"])
+            with st.form("login_form"):
+                l_user = st.text_input("Username")
+                l_pass = st.text_input("Password", type="password")
+                l_mfa = st.text_input("MFA Security Code (Default: 1234)", value="1234")
+                submit_login = st.form_submit_button("Sign In Securely", type="primary")
+                
+                if submit_login:
+                    if l_user and l_pass:
+                        role, workspace = login_user(l_user, l_pass, l_mfa)
+                        if role:
+                            st.session_state["logged_in"] = True
+                            st.session_state["username"] = l_user.strip()
+                            st.session_state["role"] = role
+                            st.session_state["workspace"] = workspace
+                            log_activity(l_user.strip(), workspace, "USER_LOGIN")
+                            st.rerun()
+                        else:
+                            st.error("Invalid Username, Password, or MFA Code.")
+                    else:
+                        st.warning("Please fill in all required login fields.")
+                    
+        with tab2:
+            st.subheader(lang["reg_sub"])
+            with st.form("register_form"):
+                r_user = st.text_input("Choose Username")
+                r_pass = st.text_input("Choose Password", type="password")
+                r_role = st.selectbox("Account Role", ["Auditor", "Admin", "CFO", "Viewer"])
+                r_workspace = st.text_input("Corporate Workspace Name", value="Global Logistics Hub")
+                r_mfa = st.text_input("Set 4-digit MFA Code", value="1234")
+                submit_reg = st.form_submit_button("Create Free Account")
+                
+                if submit_reg:
+                    if r_user and r_pass and r_workspace:
+                        success = add_user(r_user.strip(), r_pass, r_role, r_workspace.strip(), r_mfa.strip())
+                        if success:
+                            log_activity(r_user.strip(), r_workspace.strip(), "USER_REGISTER")
+                            st.toast("Free Account created successfully! Switch to Login.", icon="✅")
+                        else:
+                            st.error("Username already exists.")
+                    else:
+                        st.warning("Please fill in all fields.")
+        return
+
+    user_tier, invoices_processed = get_user_sub_info(st.session_state["username"])
+
+    st.sidebar.write(f"👤 User: **{st.session_state['username']}**")
+    st.sidebar.write(f"🏢 Workspace: **{st.session_state['workspace']}**")
+    st.sidebar.write(f"💎 Plan: **{user_tier}** ({invoices_processed}/{PLAN_LIMITS[user_tier]} used)")
+    if st.sidebar.button("Log out"):
+        log_activity(st.session_state["username"], st.session_state["workspace"], "USER_LOGOUT")
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.rerun()
+
+    st.title(lang["main_title"])
+    st.write(lang["main_desc"])
+
+    # Standard App Navigation Modes (When Logged In)
     if mode == lang["nav_process"]:
         st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
         
