@@ -26,7 +26,9 @@ import plotly.express as px
 
 st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout="wide", initial_sidebar_state="expanded")
 
-# --- Initialize session state at the very top for robust persistence ---
+# --- Initialize session state at the very top for robust session & view persistence ---
+if "view" not in st.session_state:
+    st.session_state["view"] = "dashboard"
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
@@ -547,42 +549,14 @@ LANGUAGES = {
     }
 }
 
-# --- Dynamic Sidebar Logo (Toggles between explanation page and home dashboard/login) ---
-is_about_view = st.query_params.get("view") == "about"
-logo_href = "?" if is_about_view else "?view=about"
+# --- Interactive Sidebar Logo Button (Toggles between dashboard and explanation page instantly) ---
+if st.sidebar.button("📦 LogiAudit SaaS ENGINE", key="sidebar_logo_toggle", use_container_width=True):
+    if st.session_state["view"] == "about":
+        st.session_state["view"] = "dashboard"
+    else:
+        st.session_state["view"] = "about"
+    st.rerun()
 
-logo_svg = f"""
-<a href="{logo_href}" target="_self" style="text-decoration: none; display: block;">
-<div class="custom-logo-container">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
-  <defs>
-    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#1d4ed8" />
-    </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#10b981" />
-      <stop offset="100%" stop-color="#059669" />
-    </linearGradient>
-  </defs>
-
-  <!-- Centered Larger Icon, Closer to Text -->
-  <g transform="translate(118, -2) scale(0.72)">
-    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGrad)" stroke-width="4" stroke-linejoin="round" />
-    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGrad)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-    <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-    <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-    <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-    <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-  </g>
-
-  <!-- Centered Single Line Text with Exact Styling Match -->
-  <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="10" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-</svg>
-</div>
-</a>
-"""
-st.sidebar.markdown(logo_svg, unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 st.sidebar.markdown("🌐 **Language / اللغة**")
@@ -630,21 +604,21 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    .custom-logo-container {
-        padding: 6px 8px;
-        border-radius: 12px;
-        background: transparent;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        margin-bottom: -0.5rem;
-        cursor: pointer;
-        border: 1px solid transparent;
-        text-align: center;
+    /* Style the sidebar logo button to match the sleek container design */
+    div[data-testid="stSidebar"] button[key="sidebar_logo_toggle"] {
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
+        border-radius: 12px !important;
+        font-weight: 800 !important;
+        color: #f8fafc !important;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
-    .custom-logo-container:hover {
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-        border-color: rgba(59, 130, 246, 0.3);
-        transform: translateY(-1px);
+    div[data-testid="stSidebar"] button[key="sidebar_logo_toggle"]:hover {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(16, 185, 129, 0.4) 100%) !important;
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+        border-color: #3b82f6 !important;
+        transform: translateY(-1px) !important;
     }
 
     .about-logo-container {
@@ -785,8 +759,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Explanation Page Handler (Triggered when Logo is Clicked) ---
-if is_about_view:
+# --- Explanation Page View Handler ---
+if st.session_state["view"] == "about":
     st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
 <div class="about-logo-container">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
@@ -854,10 +828,11 @@ LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakag
     col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
     with col_btn2:
         if st.button("🚀 Enter Workspace Dashboard", use_container_width=True, type="primary"):
-            st.query_params.clear()
+            st.session_state["view"] = "dashboard"
             st.rerun()
     st.stop()
 
+# --- Authentication Check ---
 if not st.session_state["logged_in"]:
     st.title(lang["login_title"])
     
