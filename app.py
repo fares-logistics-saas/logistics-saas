@@ -797,7 +797,7 @@ if st.query_params.get("view") == "about":
 <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
 <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
 </g>
-<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="9" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
+<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
 <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
@@ -847,11 +847,13 @@ LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakag
             st.rerun()
     st.stop()
 
+# --- Initialize session state for legal menu automatic resetting ---
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
     st.session_state["workspace"] = ""
+    st.session_state["legal_selection"] = "App Dashboard"
 
 if not st.session_state["logged_in"]:
     st.title(lang["login_title"])
@@ -925,23 +927,29 @@ if st.sidebar.button("Log out"):
 st.title(lang["main_title"])
 st.write(lang["main_desc"])
 
+# --- Callback function to reset the Legal/Pricing menu automatically ---
+def reset_legal_view():
+    st.session_state["legal_selection"] = "App Dashboard"
+
 st.sidebar.markdown("---")
 st.sidebar.header("📂 Navigation Categories")
 
 category_choice = st.sidebar.selectbox(
     "Select Category",
     [lang["cat_ops"], lang["cat_fin"], lang["cat_rep"], lang["cat_sys"]],
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="main_cat_choice",
+    on_change=reset_legal_view
 )
 
 if category_choice == lang["cat_ops"]:
-    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]])
+    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]], key="radio_ops", on_change=reset_legal_view)
 elif category_choice == lang["cat_fin"]:
-    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]])
+    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]], key="radio_fin", on_change=reset_legal_view)
 elif category_choice == lang["cat_rep"]:
-    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]])
+    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]], key="radio_rep", on_change=reset_legal_view)
 else:
-    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]])
+    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]], key="radio_sys", on_change=reset_legal_view)
 
 st.sidebar.markdown("---")
 st.sidebar.header("🌍 Multi-Currency & Settings")
@@ -957,7 +965,8 @@ st.sidebar.markdown("### 📄 Legal & Pricing")
 legal_mode = st.sidebar.radio(
     "Legal Pages", 
     ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
-    label_visibility="collapsed"
+    label_visibility="collapsed",
+    key="legal_selection"
 )
 
 def extract_text_from_pdf(pdf_path):
