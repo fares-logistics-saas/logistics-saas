@@ -224,6 +224,8 @@ def log_activity(username, workspace, action, target_id="N/A"):
 # --- Centralized Data Caching for Zero Latency Navigation ---
 @st.cache_data(ttl=60, show_spinner=False)
 def get_workspace_audits(workspace):
+    if not workspace:
+        return pd.DataFrame()
     try:
         return pd.read_sql(
             sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w ORDER BY timestamp DESC"),
@@ -866,9 +868,52 @@ LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakag
             st.rerun()
     st.stop()
 
-# --- Authentication Check ---
-if not st.session_state["logged_in"]:
+# --- Callback function to reset the Legal/Pricing menu automatically ---
+def reset_legal_view():
+    st.session_state["legal_selection"] = "App Dashboard"
+
+st.sidebar.markdown("---")
+st.sidebar.header("📂 Navigation Categories")
+
+category_choice = st.sidebar.selectbox(
+    "Select Category",
+    [lang["cat_ops"], lang["cat_fin"], lang["cat_rep"], lang["cat_sys"]],
+    label_visibility="collapsed",
+    key="main_cat_choice",
+    on_change=reset_legal_view
+)
+
+if category_choice == lang["cat_ops"]:
+    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]], key="radio_ops", on_change=reset_legal_view)
+elif category_choice == lang["cat_fin"]:
+    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]], key="radio_fin", on_change=reset_legal_view)
+elif category_choice == lang["cat_rep"]:
+    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]], key="radio_rep", on_change=reset_legal_view)
+else:
+    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]], key="radio_sys", on_change=reset_legal_view)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🌍 Multi-Currency & Settings")
+selected_currency = st.sidebar.selectbox("Operating Currency", ["USD ($)", "JOD (JD)", "EUR (€)"])
+min_ocean_freight = st.sidebar.number_input("Min Allowed Ocean Freight", value=700.0)
+max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3000.0)
+use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
+alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
+
+# --- Legal & Pricing Section at the Bottom of the Sidebar ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📄 Legal & Pricing")
+legal_mode = st.sidebar.radio(
+    "Legal Pages", 
+    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
+    label_visibility="collapsed",
+    key="legal_selection"
+)
+
+# --- Authentication Check (Allows Public Legal/Pricing Access for Paddle Reviewers) ---
+if not st.session_state["logged_in"] and legal_mode == "App Dashboard":
     st.title(lang["login_title"])
+    st.info("💡 **Notice for Paddle Compliance Reviewers:** You are viewing the secure enterprise portal login screen. To examine public pricing, terms, and privacy policies, please use the sidebar menu under **Legal & Pricing**.")
     
     tab1, tab2 = st.tabs(["Login", "Register New Account"])
     with tab1:
@@ -925,61 +970,20 @@ if not st.session_state["logged_in"]:
                     st.warning("Please fill in all fields.")
     st.stop()
 
-user_tier, invoices_processed = get_user_sub_info(st.session_state["username"])
+if st.session_state["logged_in"]:
+    user_tier, invoices_processed = get_user_sub_info(st.session_state["username"])
 
-st.sidebar.write(f"👤 User: **{st.session_state['username']}**")
-st.sidebar.write(f"🏢 Workspace: **{st.session_state['workspace']}**")
-st.sidebar.write(f"💎 Plan: **{user_tier}** ({invoices_processed}/{PLAN_LIMITS[user_tier]} used)")
-if st.sidebar.button("Log out"):
-    log_activity(st.session_state["username"], st.session_state["workspace"], "USER_LOGOUT")
-    st.session_state["logged_in"] = False
-    st.session_state["username"] = ""
-    st.rerun()
+    st.sidebar.write(f"👤 User: **{st.session_state['username']}**")
+    st.sidebar.write(f"🏢 Workspace: **{st.session_state['workspace']}**")
+    st.sidebar.write(f"💎 Plan: **{user_tier}** ({invoices_processed}/{PLAN_LIMITS[user_tier]} used)")
+    if st.sidebar.button("Log out"):
+        log_activity(st.session_state["username"], st.session_state["workspace"], "USER_LOGOUT")
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.rerun()
 
-st.title(lang["main_title"])
-st.write(lang["main_desc"])
-
-# --- Callback function to reset the Legal/Pricing menu automatically ---
-def reset_legal_view():
-    st.session_state["legal_selection"] = "App Dashboard"
-
-st.sidebar.markdown("---")
-st.sidebar.header("📂 Navigation Categories")
-
-category_choice = st.sidebar.selectbox(
-    "Select Category",
-    [lang["cat_ops"], lang["cat_fin"], lang["cat_rep"], lang["cat_sys"]],
-    label_visibility="collapsed",
-    key="main_cat_choice",
-    on_change=reset_legal_view
-)
-
-if category_choice == lang["cat_ops"]:
-    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]], key="radio_ops", on_change=reset_legal_view)
-elif category_choice == lang["cat_fin"]:
-    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]], key="radio_fin", on_change=reset_legal_view)
-elif category_choice == lang["cat_rep"]:
-    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]], key="radio_rep", on_change=reset_legal_view)
-else:
-    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]], key="radio_sys", on_change=reset_legal_view)
-
-st.sidebar.markdown("---")
-st.sidebar.header("🌍 Multi-Currency & Settings")
-selected_currency = st.sidebar.selectbox("Operating Currency", ["USD ($)", "JOD (JD)", "EUR (€)"])
-min_ocean_freight = st.sidebar.number_input("Min Allowed Ocean Freight", value=700.0)
-max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3000.0)
-use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
-alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
-
-# --- Legal & Pricing Section at the Very Bottom of the Sidebar ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📄 Legal & Pricing")
-legal_mode = st.sidebar.radio(
-    "Legal Pages", 
-    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
-    label_visibility="collapsed",
-    key="legal_selection"
-)
+    st.title(lang["main_title"])
+    st.write(lang["main_desc"])
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -1051,9 +1055,9 @@ def parse_invoice_with_ai(text, filename, currency):
 
 @st.fragment
 def render_active_view(mode, legal_choice):
-    df_all = get_workspace_audits(st.session_state["workspace"])
+    df_all = get_workspace_audits(st.session_state.get("workspace", ""))
     
-    # Handle Legal & Pricing Pages Selected from Bottom Sidebar
+    # Handle Legal & Pricing Pages Selected from Sidebar (Accessible Publicly)
     if legal_choice == "Pricing":
         st.subheader("🏷️ Pricing Rationale & Value Breakdown")
         st.write("Understand how LogiAudit saves your business money, why our pricing tiers are structured the way they are, and why Enterprise is the ultimate choice for logistics leaders.")
@@ -1151,12 +1155,6 @@ def render_active_view(mode, legal_choice):
             ]
         })
         st.table(comp_df)
-        
-        st.markdown("""
-        > **Bottom Line:** While **Pro** is ideal for small teams uploading invoices manually, **Enterprise** transforms your logistics finance department by seamlessly connecting to your existing ERP, scaling without volume limits, and fully automating dispute generation.
-        
-        💡 *To upgrade or manage your subscription, switch to **Billing & Subscriptions** under the **Finance & Billing** menu above.*
-        """)
         return
 
     elif legal_choice == "Privacy Policy":
@@ -1186,6 +1184,11 @@ def render_active_view(mode, legal_choice):
         * **Service Availability:** While we strive for 99.9% uptime, services may be subject to scheduled maintenance or unforeseen network interruptions.
         """)
         return
+
+    if not st.session_state["logged_in"]:
+        return
+
+    user_tier, invoices_processed = get_user_sub_info(st.session_state["username"])
 
     # Standard App Navigation Modes (When 'App Dashboard' is selected)
     if mode == lang["nav_process"]:
