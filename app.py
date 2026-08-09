@@ -596,6 +596,16 @@ st.sidebar.markdown("🌐 **Language / اللغة**")
 selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed")
 lang = LANGUAGES[selected_lang]
 
+# --- Legal & Pricing Section placed directly under Language Selection ---
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📄 Legal & Pricing")
+legal_mode = st.sidebar.radio(
+    "Legal Pages", 
+    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
+    label_visibility="collapsed",
+    key="legal_selection"
+)
+
 # --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
 st.markdown("""
     <style>
@@ -900,16 +910,6 @@ max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
 alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
 
-# --- Legal & Pricing Section at the Bottom of the Sidebar ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📄 Legal & Pricing")
-legal_mode = st.sidebar.radio(
-    "Legal Pages", 
-    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
-    label_visibility="collapsed",
-    key="legal_selection"
-)
-
 # --- Authentication Check (Allows Public Legal/Pricing Access for Paddle Reviewers) ---
 if not st.session_state["logged_in"] and legal_mode == "App Dashboard":
     st.title(lang["login_title"])
@@ -1199,7 +1199,7 @@ def render_active_view(mode, legal_choice):
         
         if remaining <= 0:
             st.error(f"🛑 Usage Limit Reached! Your {user_tier} plan allows {limit} invoices max. Please upgrade your account to continue auditing.")
-            st.info("Navigate to the 'Pricing' option at the bottom of the sidebar to upgrade.")
+            st.info("Navigate to the 'Pricing' option under Legal & Pricing to upgrade.")
         else:
             st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
             
