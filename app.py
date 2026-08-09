@@ -29,6 +29,13 @@ st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout=
 # --- Initialize session state at the very top for robust session & view persistence ---
 if "view" not in st.session_state:
     st.session_state["view"] = "dashboard"
+    
+# Sync URL query param to session state for seamless HTML link toggling
+q_view = st.query_params.get("view")
+if q_view in ["about", "dashboard"]:
+    st.session_state["view"] = q_view
+    st.query_params.clear() # Clear URL visually to keep it clean
+
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
@@ -550,13 +557,27 @@ LANGUAGES = {
 }
 
 # --- Interactive Sidebar Logo Button (Toggles between dashboard and explanation page instantly) ---
-if st.sidebar.button("📦 LogiAudit SaaS ENGINE", key="sidebar_logo_toggle", use_container_width=True):
-    if st.session_state["view"] == "about":
-        st.session_state["view"] = "dashboard"
-    else:
-        st.session_state["view"] = "about"
-    st.rerun()
-
+target_view = "dashboard" if st.session_state.get("view") == "about" else "about"
+logo_html = f"""
+<a href="?view={target_view}" target="_self" style="text-decoration: none; display: block; margin-bottom: 1rem;">
+    <div class="custom-logo-container">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="28" height="28">
+                <g transform="translate(10, 5) scale(0.9)">
+                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="#93c5fd" stroke-width="6" stroke-linejoin="round" />
+                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="#93c5fd" stroke-width="4" stroke-linejoin="round" opacity="0.6" />
+                    <circle cx="65" cy="65" r="24" fill="#030712" stroke="#10b981" stroke-width="5" />
+                    <path d="M53 65 L60 72 L76 55" fill="none" stroke="#10b981" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                </g>
+            </svg>
+            <span style="font-family: system-ui, -apple-system, sans-serif; font-size: 16px; font-weight: 800; color: #f8fafc; letter-spacing: 0.1px;">
+                Logi<span style="color: #93c5fd;">Audit</span> <span style="font-size: 11px; font-weight: 600; color: #e2e8f0;">SaaS ENGINE</span>
+            </span>
+        </div>
+    </div>
+</a>
+"""
+st.sidebar.markdown(logo_html, unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 st.sidebar.markdown("🌐 **Language / اللغة**")
@@ -604,21 +625,24 @@ st.markdown("""
         color: #f8fafc !important;
     }
     
-    /* Style the sidebar logo button to match the sleek container design */
-    div[data-testid="stSidebar"] button[key="sidebar_logo_toggle"] {
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%) !important;
-        border: 1px solid rgba(59, 130, 246, 0.3) !important;
-        border-radius: 12px !important;
-        font-weight: 800 !important;
-        color: #f8fafc !important;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3) !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    /* Interactive custom container for sidebar logo button */
+    .custom-logo-container {
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%);
+        backdrop-filter: blur(10px);
+        color: white;
+        border: none;
+        padding: 10px 12px;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-align: center;
+        cursor: pointer;
+        margin-bottom: -0.5rem;
     }
-    div[data-testid="stSidebar"] button[key="sidebar_logo_toggle"]:hover {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(16, 185, 129, 0.4) 100%) !important;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-        border-color: #3b82f6 !important;
-        transform: translateY(-1px) !important;
+    .custom-logo-container:hover {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        transform: translateY(-1px);
     }
 
     .about-logo-container {
