@@ -547,9 +547,12 @@ LANGUAGES = {
     }
 }
 
-# --- Clickable Sidebar Logo (Links to root '?' to act like Workspace Dashboard) ---
-logo_svg = """
-<a href="?" target="_self" style="text-decoration: none; display: block;">
+# --- Dynamic Sidebar Logo (Toggles between explanation page and home dashboard/login) ---
+is_about_view = st.query_params.get("view") == "about"
+logo_href = "?" if is_about_view else "?view=about"
+
+logo_svg = f"""
+<a href="{logo_href}" target="_self" style="text-decoration: none; display: block;">
 <div class="custom-logo-container">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="100%" height="100%">
   <defs>
@@ -783,7 +786,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Explanation Page Handler (Triggered when Logo is Clicked) ---
-if st.query_params.get("view") == "about":
+if is_about_view:
     st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
 <div class="about-logo-container">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
