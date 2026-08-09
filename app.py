@@ -558,10 +558,11 @@ LANGUAGES = {
     }
 }
 
-# --- Interactive Sidebar Logo Button (Toggles between dashboard and explanation page instantly) ---
+# --- Interactive Sidebar Logo Button (Toggles between dashboard and explanation page instantly without reload) ---
 target_view = "dashboard" if st.session_state.get("view") == "about" else "about"
+
 logo_html = f"""
-<a href="?view={target_view}" target="_self" style="text-decoration: none; display: block; margin-bottom: 1rem;">
+<div id="sidebar-logo" style="text-decoration: none; display: block; margin-bottom: 1rem; cursor: pointer;">
     <div class="custom-logo-container">
         <div style="display: flex; align-items: center; justify-content: center;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="58">
@@ -587,9 +588,27 @@ logo_html = f"""
             </svg>
         </div>
     </div>
-</a>
+</div>
+<img src="dummy" style="display:none;" onerror="
+    setTimeout(() => {{
+        let logo = document.getElementById('sidebar-logo');
+        let btns = Array.from(document.querySelectorAll('.stButton button'));
+        let target = btns.find(b => b.innerText.includes('__HIDDEN_TOGGLE__'));
+        if (target) {{
+            let container = target.closest('[data-testid=\\'stElementContainer\\']');
+            if (container) container.style.display = 'none';
+            if (logo) {{
+                logo.onclick = () => target.click();
+            }}
+        }}
+    }}, 100);
+">
 """
 st.sidebar.markdown(logo_html, unsafe_allow_html=True)
+if st.sidebar.button("__HIDDEN_TOGGLE__", key="hidden_logo_toggle"):
+    st.session_state["view"] = target_view
+    st.rerun()
+
 st.sidebar.markdown("---")
 
 st.sidebar.markdown("🌐 **Language / اللغة**")
@@ -808,7 +827,7 @@ st.markdown("""
 # --- Explanation Page View Handler ---
 if st.session_state["view"] == "about":
     st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
-<div class="about-logo-container">
+<div id="about-main-logo" class="about-logo-container" style="cursor: pointer;">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
 <defs>
 <linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -831,6 +850,16 @@ if st.session_state["view"] == "about":
 <text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
 </svg>
 </div>
+<img src="dummy" style="display:none;" onerror="
+    setTimeout(() => {
+        let aboutLogo = document.getElementById('about-main-logo');
+        let btns = Array.from(document.querySelectorAll('.stButton button'));
+        let enterBtn = btns.find(b => b.innerText.includes('Enter Workspace Dashboard'));
+        if (aboutLogo && enterBtn) {
+            aboutLogo.onclick = () => enterBtn.click();
+        }
+    }, 100);
+">
 <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
 <p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin: 0 auto 3rem auto; line-height: 1.6;">
 LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.
