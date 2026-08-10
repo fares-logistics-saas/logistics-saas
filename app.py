@@ -43,6 +43,10 @@ if "return_category" not in st.session_state:
     st.session_state["return_category"] = None
 if "restoring_dashboard" not in st.session_state:
     st.session_state["restoring_dashboard"] = False
+if "current_active_mode" not in st.session_state:
+    st.session_state["current_active_mode"] = None
+if "current_active_category" not in st.session_state:
+    st.session_state["current_active_category"] = None
 
 # --- Paddle Live Settings (Secrets) ---
 try:
@@ -567,11 +571,6 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Completely hide the toggle button container so it's 100% invisible */
-    div.stButton:has(button[key="logo_click_trigger"]) {
-        display: none !important;
-    }
-
     html, body, [data-testid="stApp"], .stApp {
         background-color: #030712 !important;
         color: #f8fafc !important;
@@ -813,33 +812,36 @@ logo_html = f"""
 st.sidebar.markdown(logo_html, unsafe_allow_html=True)
 
 # Hidden button linked to logo click handling
-if st.sidebar.button("Toggle Logo", key="logo_click_trigger"):
+if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
     if st.session_state["view"] == "dashboard":
-        # Save current active page mode before going to about
-        current_mode = st.session_state.get("radio_ops") or st.session_state.get("radio_fin") or st.session_state.get("radio_rep") or st.session_state.get("radio_sys")
-        st.session_state["return_mode"] = current_mode
-        if current_mode:
-            # Determine category based on current language
-            lang_temp = LANGUAGES.get(st.session_state.get("selected_lang", "English"), LANGUAGES["English"])
-            cat, _ = get_category_and_radio_key(current_mode, lang_temp)
-            st.session_state["return_category"] = cat
+        # Save exact current active page and category for returning correctly
+        st.session_state["return_category"] = st.session_state.get("current_active_category")
+        st.session_state["return_mode"] = st.session_state.get("current_active_mode")
         st.session_state["view"] = "about"
     else:
         st.session_state["view"] = "dashboard"
         st.session_state["restoring_dashboard"] = True
     st.rerun()
 
-# JS snippet to make the SVG logo container clickable and trigger the hidden button instantly
+# JS snippet to make the SVG logo container clickable and violently hide the button element from DOM
 logo_click_js = """
 <img src="dummy" style="display:none;" onerror="
     setTimeout(() => {
         let logoContainer = document.querySelector('.custom-logo-container');
-        let hiddenBtn = document.querySelector('button[key=\\'logo_click_trigger\\']') || Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Toggle Logo'));
+        let hiddenBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Toggle_Logo_Hidden'));
+        
+        if (hiddenBtn) {
+            let btnContainer = hiddenBtn.closest('[data-testid=\\'stElementContainer\\']');
+            if (btnContainer) {
+                btnContainer.style.display = 'none'; // Completely vanish the button and its empty spacing
+            }
+        }
+        
         if (logoContainer && hiddenBtn) {
             logoContainer.style.cursor = 'pointer';
             logoContainer.onclick = () => hiddenBtn.click();
         }
-    }, 150);
+    }, 50);
 ">
 """
 st.sidebar.markdown(logo_click_js, unsafe_allow_html=True)
@@ -969,6 +971,10 @@ elif category_choice == lang["cat_rep"]:
     app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]], key="radio_rep", on_change=reset_legal_view)
 else:
     app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]], key="radio_sys", on_change=reset_legal_view)
+
+# Actively track the current page so we can precisely restore it when clicking the logo
+st.session_state["current_active_category"] = category_choice
+st.session_state["current_active_mode"] = app_mode
 
 st.sidebar.markdown("---")
 st.sidebar.header("🌍 Multi-Currency & Settings")
