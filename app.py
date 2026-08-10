@@ -598,7 +598,7 @@ st.markdown("""
     }
     .stApp {
         background-image: radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.18) 0%, transparent 45%),
-                         radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
+                        radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
     }
     h1, h2, h3, h4, h5, h6, p, span, label, div {
         color: #f8fafc !important;
@@ -779,40 +779,8 @@ def get_category_and_radio_key(mode_name, lang_dict):
         return lang_dict["cat_sys"], "radio_sys"
     return lang_dict["cat_ops"], "radio_ops"
 
-# --- Sidebar Logo & Click Trigger Setup ---
-logo_html = f"""
-<div style="text-decoration: none; display: block; margin-bottom: 1rem;">
-    <div class="custom-logo-container">
-        <div style="display: flex; align-items: center; justify-content: center;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="58">
-                <defs>
-                    <linearGradient id="primaryGradBtn" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#3b82f6" />
-                        <stop offset="100%" stop-color="#1d4ed8" />
-                    </linearGradient>
-                    <linearGradient id="accentGradBtn" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#10b981" />
-                        <stop offset="100%" stop-color="#059669" />
-                    </linearGradient>
-                </defs>
-                <g transform="translate(10, -2) scale(1.15)">
-                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBtn)" stroke-width="4" stroke-linejoin="round" />
-                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBtn)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-                    <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-                    <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-                    <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-                    <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBtn)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                </g>
-                <text x="120" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="18" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-            </svg>
-        </div>
-    </div>
-</div>
-"""
-st.sidebar.markdown(logo_html, unsafe_allow_html=True)
-
-# Hidden button linked to logo click handling
-if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
+# --- Sidebar Logo Button Setup ---
+if st.sidebar.button("📦 LogiAudit SaaS ENGINE", use_container_width=True):
     if st.session_state["view"] == "dashboard":
         st.session_state["return_category"] = st.session_state.get("current_active_category")
         st.session_state["return_mode"] = st.session_state.get("current_active_mode")
@@ -821,9 +789,6 @@ if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
         st.session_state["view"] = "dashboard"
         st.session_state["restoring_dashboard"] = True
     st.rerun()
-
-# This guarantees NO raw text leakage by rendering as a continuous invisible block
-st.sidebar.markdown("""<div style='display:none;'><img src='x' onerror="setTimeout(()=>{let c=document.querySelector('.custom-logo-container');let b=Array.from(document.querySelectorAll('button')).find(x=>x.innerText.includes('Toggle_Logo_Hidden'));if(b){let p=b.closest('[data-testid=\\'stElementContainer\\']');if(p)p.style.display='none';}if(c&&b){c.style.cursor='pointer';c.onclick=()=>b.click();}},50);"></div>""", unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 
@@ -844,29 +809,6 @@ legal_mode = st.sidebar.radio(
 # --- Explanation Page View Handler ---
 if st.session_state["view"] == "about":
     st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
-<div id="about-main-logo" class="about-logo-container" style="cursor: pointer;">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
-<defs>
-<linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
-<stop offset="0%" stop-color="#3b82f6" />
-<stop offset="100%" stop-color="#1d4ed8" />
-</linearGradient>
-<linearGradient id="accentGradBig" x1="0%" y1="0%" x2="100%" y2="0%">
-<stop offset="0%" stop-color="#10b981" />
-<stop offset="100%" stop-color="#059669" />
-</linearGradient>
-</defs>
-<g transform="translate(120, 4) scale(1.05)">
-<path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBig)" stroke-width="4" stroke-linejoin="round" />
-<path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBig)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-<line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-<line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-<circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-<path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-</g>
-<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-</svg>
-</div>
 <h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
 <p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin: 0 auto 3rem auto; line-height: 1.6;">
 LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.
