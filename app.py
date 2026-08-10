@@ -566,7 +566,7 @@ LANGUAGES = {
 # --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
 st.markdown("""
     <style>
-    /* 🔴 HIDDEN DEFAULT PAGE NAVIGATION & HIDDEN OVERLAY BUTTON CONTAINER 🔴 */
+    /* 🔴 HIDDEN DEFAULT PAGE NAVIGATION 🔴 */
     [data-testid="stSidebarNav"] {
         display: none !important;
     }
@@ -814,7 +814,6 @@ st.sidebar.markdown(logo_html, unsafe_allow_html=True)
 # Hidden button linked to logo click handling
 if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
     if st.session_state["view"] == "dashboard":
-        # Save exact current active page and category for returning correctly
         st.session_state["return_category"] = st.session_state.get("current_active_category")
         st.session_state["return_mode"] = st.session_state.get("current_active_mode")
         st.session_state["view"] = "about"
@@ -823,28 +822,9 @@ if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
         st.session_state["restoring_dashboard"] = True
     st.rerun()
 
-# JS snippet to make the SVG logo container clickable and violently hide the button element from DOM
-logo_click_js = """
-<img src="dummy" style="display:none;" onerror="
-    setTimeout(() => {
-        let logoContainer = document.querySelector('.custom-logo-container');
-        let hiddenBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Toggle_Logo_Hidden'));
-        
-        if (hiddenBtn) {
-            let btnContainer = hiddenBtn.closest('[data-testid=\\'stElementContainer\\']');
-            if (btnContainer) {
-                btnContainer.style.display = 'none'; // Completely vanish the button and its empty spacing
-            }
-        }
-        
-        if (logoContainer && hiddenBtn) {
-            logoContainer.style.cursor = 'pointer';
-            logoContainer.onclick = () => hiddenBtn.click();
-        }
-    }, 50);
-">
-"""
-st.sidebar.markdown(logo_click_js, unsafe_allow_html=True)
+# This guarantees NO raw text leakage by rendering as a continuous invisible block
+st.sidebar.markdown("""<div style='display:none;'><img src='x' onerror="setTimeout(()=>{let c=document.querySelector('.custom-logo-container');let b=Array.from(document.querySelectorAll('button')).find(x=>x.innerText.includes('Toggle_Logo_Hidden'));if(b){let p=b.closest('[data-testid=\\'stElementContainer\\']');if(p)p.style.display='none';}if(c&&b){c.style.cursor='pointer';c.onclick=()=>b.click();}},50);"></div>""", unsafe_allow_html=True)
+
 st.sidebar.markdown("---")
 
 st.sidebar.markdown("🌐 **Language / اللغة**")
