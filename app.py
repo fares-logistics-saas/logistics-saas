@@ -1548,3 +1548,4 @@ def render_active_view(mode, legal_choice):
             st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
 
 render_active_view(app_mode, legal_mode)
+  
