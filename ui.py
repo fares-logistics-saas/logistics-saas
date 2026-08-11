@@ -379,6 +379,12 @@ def get_category_and_radio_key(
     """
     Get the category and radio key for a given mode name.
     
+    Navigation structure (tier-aware):
+    - Operations (all tiers): Process, Review
+    - Finance (Pro+): Billing, Dispute, CFO Workflow
+    - Reports (all tiers): Analytics, Alerts, History; Scheduler (Enterprise)
+    - Advanced (Enterprise): AI Assistant, IoT/GPS, Vendor Assessment, Tariff, ERP
+    
     Args:
         mode_name: The navigation mode name.
         lang_dict: The language dictionary for labels.
@@ -386,10 +392,20 @@ def get_category_and_radio_key(
     Returns:
         Tuple of (category_name, radio_key).
     """
-    ops_list = [lang_dict["nav_process"], lang_dict["nav_review"], lang_dict["nav_iot"]]
+    # Core operations (simplified - IoT moved to Advanced)
+    ops_list = [lang_dict["nav_process"], lang_dict["nav_review"]]
+    # Finance options (Pro+ tiers)
     fin_list = [lang_dict["nav_billing"], lang_dict["nav_dispute"], lang_dict["nav_workflow"]]
+    # Reports (Scheduler is Enterprise only but still in this category)
     rep_list = [lang_dict["nav_kpi"], lang_dict["nav_alerts"], lang_dict["nav_history"], lang_dict["nav_scheduler"]]
-    sys_list = [lang_dict["nav_voice"], "Vendor Risk Assessment", lang_dict["nav_tariff"], lang_dict["nav_erp"]]
+    # Advanced/System (Enterprise only - includes IoT now)
+    sys_list = [
+        lang_dict["nav_voice"],
+        lang_dict["nav_iot"],
+        "Vendor Risk Assessment",
+        lang_dict["nav_tariff"],
+        lang_dict["nav_erp"]
+    ]
     
     if mode_name in ops_list:
         return lang_dict["cat_ops"], "radio_ops"
