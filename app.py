@@ -176,41 +176,78 @@ def reset_legal_view() -> None:
 
 
 st.sidebar.markdown("---")
-st.sidebar.header("📂 Navigation Categories")
+st.sidebar.header("📂 Navigation")
+
+# Get user tier for tier-based navigation
+_user_tier = "Free"
+if st.session_state.get("logged_in"):
+    _user_tier, _ = get_user_sub_info(st.session_state["username"])
+
+# Build tier-aware navigation categories
+# Core workflow always visible: Upload → Review → Approve → Reports
+# Advanced features in Settings (Pro+), Enterprise features (Enterprise only)
+_available_categories = [lang["cat_ops"], lang["cat_rep"]]
+
+# Pro+ users see Finance category
+if _user_tier in ["Pro", "Enterprise"]:
+    _available_categories.insert(1, lang["cat_fin"])
+
+# Enterprise users see Advanced/Settings category with integrations
+if _user_tier == "Enterprise":
+    _available_categories.append(lang["cat_sys"])
 
 category_choice = st.sidebar.selectbox(
     "Select Category",
-    [lang["cat_ops"], lang["cat_fin"], lang["cat_rep"], lang["cat_sys"]],
+    _available_categories,
     label_visibility="collapsed",
     key="main_cat_choice",
     on_change=reset_legal_view
 )
 
 if category_choice == lang["cat_ops"]:
+    # Core workflow: Upload → Review (simplified from 3 items)
+    # IoT/GPS Tracking moved to Enterprise-only Advanced section
+    _ops_items = [lang["nav_process"], lang["nav_review"]]
     app_mode = st.sidebar.radio(
-        "Ops Menu",
-        [lang["nav_process"], lang["nav_review"], lang["nav_iot"]],
+        "Workflow",
+        _ops_items,
         key="radio_ops",
         on_change=reset_legal_view
     )
 elif category_choice == lang["cat_fin"]:
+    # Finance: Billing, Dispute, CFO Approval (Pro+ only)
+    _fin_items = [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]]
     app_mode = st.sidebar.radio(
-        "Fin Menu",
-        [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]],
+        "Finance",
+        _fin_items,
         key="radio_fin",
         on_change=reset_legal_view
     )
 elif category_choice == lang["cat_rep"]:
+    # Reports: Analytics, Alerts, History (simplified for all tiers)
+    # Scheduler moved to Enterprise-only
+    _rep_items = [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"]]
+    if _user_tier == "Enterprise":
+        _rep_items.append(lang["nav_scheduler"])
     app_mode = st.sidebar.radio(
-        "Rep Menu",
-        [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]],
+        "Reports",
+        _rep_items,
         key="radio_rep",
         on_change=reset_legal_view
     )
 else:
+    # Advanced/Integrations (Enterprise only)
+    # Contains: AI Assistant, IoT Tracking, Vendor Assessment, Tariff Classifier, ERP Integration
+    _sys_items = [
+        lang["nav_voice"],
+        lang["nav_iot"],
+        "Vendor Risk Assessment",
+        lang["nav_tariff"],
+        lang["nav_erp"]
+    ]
     app_mode = st.sidebar.radio(
-        "Sys Menu",
-        [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]],
+        "Advanced",
+        _sys_items,
         key="radio_sys",
         on_change=reset_legal_view
     )
@@ -749,8 +786,19 @@ def _render_review_queue(df_all: pd.DataFrame) -> None:
 
 
 def _render_dispute_generator(df_all: pd.DataFrame) -> None:
-    """Render the dispute letter generator page."""
+    """Render the dispute letter generator page (Pro+ feature)."""
     st.subheader("⚖️ Automated Dispute Letter Generator")
+    
+    # Check tier - this is a Pro+ feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier == "Free":
+        st.warning(
+            "🔒 **Pro Feature**: Automated dispute letter generation with legal templates "
+            "is available on Pro and Enterprise plans. Upgrade to generate formal dispute notices."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     df_disputes = df_all[df_all['status'] != '✅ Approved']
     if not df_disputes.empty:
         for _, row in df_disputes.iterrows():
@@ -773,8 +821,19 @@ def _render_dispute_generator(df_all: pd.DataFrame) -> None:
 
 
 def _render_iot_tracking(df_all: pd.DataFrame) -> None:
-    """Render the IoT GPS tracking page."""
+    """Render the IoT GPS tracking page (Enterprise feature)."""
     st.subheader("🛰️ IoT GPS & Live Carrier Tracking (DHL / Aramex API)")
+    
+    # Check tier - this is an Enterprise feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier != "Enterprise":
+        st.warning(
+            "🔒 **Enterprise Feature**: Live carrier GPS tracking and IoT integration is available "
+            "on the Enterprise plan. Upgrade to unlock real-time shipment visibility."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     carrier_choice = st.selectbox("Select Carrier for Live Tracking Query", ["DHL", "Aramex", "Maersk"])
     query_track = st.text_input("Enter Tracking ID or Container No to Live Query")
     if st.button("Query Live Carrier API"):
@@ -786,8 +845,19 @@ def _render_iot_tracking(df_all: pd.DataFrame) -> None:
 
 
 def _render_cfo_workflow(df_all: pd.DataFrame) -> None:
-    """Render the CFO approval workflow page."""
+    """Render the CFO approval workflow page (Pro+ feature)."""
     st.subheader("👔 Multi-Tier CFO Approval Workflow")
+    
+    # Check tier - this is a Pro+ feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier == "Free":
+        st.warning(
+            "🔒 **Pro Feature**: CFO digital approval workflow with multi-tier sign-off "
+            "is available on Pro and Enterprise plans. Upgrade for executive approval tracking."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     if has_permission(st.session_state["role"], "approve_cfo"):
         df_cfo = df_all[df_all['status'] != '✅ Approved']
         if not df_cfo.empty:
@@ -813,8 +883,19 @@ def _render_cfo_workflow(df_all: pd.DataFrame) -> None:
 
 
 def _render_ai_assistant(df_all: pd.DataFrame) -> None:
-    """Render the AI voice/text assistant page."""
+    """Render the AI voice/text assistant page (Enterprise feature)."""
     st.subheader("🎙️ AI Voice & Text Audit Assistant")
+    
+    # Check tier - this is an Enterprise feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier != "Enterprise":
+        st.warning(
+            "🔒 **Enterprise Feature**: The AI-powered audit assistant with natural language queries "
+            "is available on the Enterprise plan. Upgrade to ask questions about your logistics data."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
     if st.button("Ask AI"):
         if "leakage" in user_query.lower() or "هدر" in user_query.lower():
@@ -903,8 +984,19 @@ def _render_alerts(df_all: pd.DataFrame) -> None:
 
 
 def _render_scheduler(df_all: pd.DataFrame) -> None:
-    """Render the report scheduler page."""
+    """Render the report scheduler page (Enterprise feature)."""
     st.subheader("📅 Automated Report Scheduler & Dispatcher")
+    
+    # Check tier - this is an Enterprise feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier != "Enterprise":
+        st.warning(
+            "🔒 **Enterprise Feature**: Automated report scheduling and email dispatch "
+            "is available on the Enterprise plan. Upgrade for scheduled executive reports."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     if has_permission(st.session_state["role"], "schedule_reports"):
         sched_email = st.text_input("Recipient Email for Scheduled Report", value=DEFAULT_CFO_EMAIL)
 
@@ -927,8 +1019,19 @@ def _render_scheduler(df_all: pd.DataFrame) -> None:
 
 
 def _render_vendor_assessment(df_all: pd.DataFrame) -> None:
-    """Render the vendor risk assessment page."""
+    """Render the vendor risk assessment page (Enterprise feature)."""
     st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
+    
+    # Check tier - this is an Enterprise feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier != "Enterprise":
+        st.warning(
+            "🔒 **Enterprise Feature**: Vendor risk scoring and compliance assessment analytics "
+            "is available on the Enterprise plan. Upgrade to evaluate vendor performance."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     if not df_all.empty:
         df_vendor = df_all.groupby(['username', 'workspace', 'status']).size().reset_index(name='count')
         st.dataframe(df_vendor, use_container_width=True)
@@ -937,8 +1040,19 @@ def _render_vendor_assessment(df_all: pd.DataFrame) -> None:
 
 
 def _render_tariff_classifier() -> None:
-    """Render the customs tariff classifier page."""
+    """Render the customs tariff classifier page (Enterprise feature)."""
     st.subheader("🏷️ AI Customs Tariff & HS Code Auto-Classifier")
+    
+    # Check tier - this is an Enterprise feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier != "Enterprise":
+        st.warning(
+            "🔒 **Enterprise Feature**: AI-powered customs tariff classification and HS code lookup "
+            "is available on the Enterprise plan. Upgrade for automated import duty calculations."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     item_desc = st.text_input(
         "Enter Goods Description (e.g., 'MacBook Pro M3 Laptop', 'Industrial Hydraulic Pump')"
     )
@@ -948,8 +1062,19 @@ def _render_tariff_classifier() -> None:
 
 
 def _render_erp_integration() -> None:
-    """Render the ERP/webhook integration page."""
+    """Render the ERP/webhook integration page (Enterprise feature)."""
     st.subheader("🔌 ERP & Webhook Integrations")
+    
+    # Check tier - this is an Enterprise feature
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    if user_tier != "Enterprise":
+        st.warning(
+            "🔒 **Enterprise Feature**: Direct ERP webhook integration with SAP, Oracle, and NetSuite "
+            "is available on the Enterprise plan. Upgrade for automated data synchronization."
+        )
+        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+        return
+    
     webhook_url = st.text_input(
         "Enterprise ERP Webhook Endpoint URL",
         value="https://api.yourcompany.com/erp/v1/webhooks/audit"
