@@ -11,3 +11,4 @@ pytesseract
 pdf2image
 requests
 stripe
+bcrypt

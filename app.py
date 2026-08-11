@@ -1,32 +1,80 @@
+"""
+Logistics SaaS Engine - Main Application
+
+Enterprise-grade logistics invoice auditing platform with AI-powered OCR,
+automated discrepancy detection, and CFO workflow integration.
+"""
+
 import os
 import re
-import platform
-import hashlib
-import smtplib
-import json
-import requests
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
-from PIL import Image
-import pypdf
-import pytesseract
-from pdf2image import convert_from_path
+
 import streamlit as st
 import pandas as pd
-import sqlalchemy
-from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-import openai
 import plotly.express as px
+from PIL import Image
+import pytesseract
 
-st.set_page_config(page_title="Logistics SaaS Engine", page_icon="📦", layout="wide", initial_sidebar_state="expanded")
+# Import from modules
+from config import (
+    LANGUAGES,
+    PLAN_LIMITS,
+    DEFAULT_ALERT_EMAIL,
+    DEFAULT_CFO_EMAIL,
+    DEFAULT_MIN_OCEAN_FREIGHT,
+    DEFAULT_MAX_OCEAN_FREIGHT,
+    validate_email,
+    validate_webhook_url,
+)
+from database import (
+    init_db,
+    log_activity,
+    get_workspace_audits,
+    get_user_sub_info,
+    increment_usage,
+    upgrade_tier,
+    save_audit_record,
+    update_audit_record,
+    approve_cfo_record,
+    engine,
+)
+from auth import (
+    add_user,
+    login_user,
+    has_permission,
+    get_login_count,
+)
+from ui import (
+    get_styles_css,
+    get_logo_html,
+    get_about_page_html,
+    get_feature_card_html,
+    get_pricing_card_html,
+    get_category_and_radio_key,
+    get_logo_click_handler_js,
+    render_about_page,
+)
+from business_logic import (
+    extract_text_from_pdf,
+    cleanup_temp_file,
+    parse_invoice_with_ai,
+    generate_executive_pdf,
+    generate_dispute_letter_pdf,
+    send_email_alert,
+    send_automated_report,
+    fetch_live_carrier_tracking,
+    create_paddle_checkout,
+    test_webhook_connection,
+)
 
-# --- Initialize session state at the very top for robust session & view persistence ---
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="Logistics SaaS Engine",
+    page_icon="📦",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- Initialize session state ---
 if "view" not in st.session_state:
     st.session_state["view"] = "dashboard"
 
@@ -48,7 +96,7 @@ if "current_active_mode" not in st.session_state:
 if "current_active_category" not in st.session_state:
     st.session_state["current_active_category"] = None
 
-# --- Paddle Live Settings (Secrets) ---
+# --- Paddle Live Settings (from Secrets) ---
 try:
     PRO_PRICE_ID = st.secrets["paddle"]["PRO_PRICE_ID"]
     ENTERPRISE_PRICE_ID = st.secrets["paddle"]["ENTERPRISE_PRICE_ID"]
@@ -58,760 +106,16 @@ except Exception:
     ENTERPRISE_PRICE_ID = None
     PADDLE_API_KEY = None
 
-# --- Automatic Path Detection ---
-if platform.system() == "Windows":
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    POPPLER_PATH = r"C:\poppler\Library\bin"
-else:
-    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
-    POPPLER_PATH = None
-
-def make_hashes(password):
-    return hashlib.sha256(str.encode(password)).hexdigest()
-
-# --- Database Engine Configuration (Cached for Zero Latency) ---
-@st.cache_resource
-def get_db_engine():
-    DB_URL = "sqlite:///logistics_audits.db"
-    if "postgres" in st.secrets and "url" in st.secrets["postgres"]:
-        secret_url = st.secrets["postgres"]["url"]
-        if "hostname" not in secret_url and "port" not in secret_url and "username" not in secret_url:
-            DB_URL = secret_url
-    return sqlalchemy.create_engine(DB_URL, pool_pre_ping=True)
-
-engine = get_db_engine()
-
-# --- RBAC Permissions Matrix ---
-PERMISSIONS = {
-    "Admin": ["all"],
-    "CFO": ["view_reports", "approve_cfo", "view_history", "analytics", "schedule_reports"],
-    "Auditor": ["process", "view_history", "iot", "tariff"],
-    "Viewer": ["view_history", "analytics"]
-}
-
-def has_permission(role, action):
-    if role not in PERMISSIONS: 
-        return False
-    return "all" in PERMISSIONS[role] or action in PERMISSIONS[role]
-
-# --- Initialize Enterprise Database Tables & Activity Logs (Run Once) ---
-@st.cache_resource
-def init_db():
-    db_url_str = str(engine.url)
-    with engine.begin() as conn:
-        if "sqlite" in db_url_str:
-            conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS audits (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    filename TEXT,
-                    tracking_id TEXT,
-                    container_no TEXT,
-                    port TEXT,
-                    hs_code TEXT,
-                    stamp_status TEXT,
-                    iot_status TEXT DEFAULT 'GPS Active (On Schedule)',
-                    cfo_approval TEXT DEFAULT 'Pending CFO Sign-off',
-                    date TEXT,
-                    currency TEXT,
-                    status TEXT,
-                    review_status TEXT DEFAULT 'Pending Review',
-                    audit_hash TEXT,
-                    workspace TEXT,
-                    username TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS users (
-                    username TEXT PRIMARY KEY,
-                    password TEXT,
-                    role TEXT,
-                    workspace TEXT DEFAULT 'Default Corp',
-                    mfa_code TEXT DEFAULT '1234',
-                    subscription_tier TEXT DEFAULT 'Free',
-                    invoices_processed INTEGER DEFAULT 0
-                )
-            """))
-            conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS activity_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT,
-                    workspace TEXT,
-                    action TEXT,
-                    target_id TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-        else:
-            conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS audits (
-                    id SERIAL PRIMARY KEY,
-                    filename TEXT,
-                    tracking_id TEXT,
-                    container_no TEXT,
-                    port TEXT,
-                    hs_code TEXT,
-                    stamp_status TEXT,
-                    iot_status TEXT DEFAULT 'GPS Active (On Schedule)',
-                    cfo_approval TEXT DEFAULT 'Pending CFO Sign-off',
-                    date TEXT,
-                    currency TEXT,
-                    status TEXT,
-                    review_status TEXT DEFAULT 'Pending Review',
-                    audit_hash TEXT,
-                    workspace TEXT,
-                    username TEXT,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS users (
-                    username TEXT PRIMARY KEY,
-                    password TEXT,
-                    role TEXT,
-                    workspace TEXT DEFAULT 'Default Corp',
-                    mfa_code TEXT DEFAULT '1234',
-                    subscription_tier TEXT DEFAULT 'Free',
-                    invoices_processed INTEGER DEFAULT 0
-                )
-            """))
-            conn.execute(sqlalchemy.text("""
-                CREATE TABLE IF NOT EXISTS activity_logs (
-                    id SERIAL PRIMARY KEY,
-                    username TEXT,
-                    workspace TEXT,
-                    action TEXT,
-                    target_id TEXT,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-
-    migrations = [
-        "ALTER TABLE users ADD COLUMN workspace TEXT DEFAULT 'Default Corp'",
-        "ALTER TABLE users ADD COLUMN mfa_code TEXT DEFAULT '1234'",
-        "ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'Free'",
-        "ALTER TABLE users ADD COLUMN invoices_processed INTEGER DEFAULT 0",
-        "ALTER TABLE audits ADD COLUMN hs_code TEXT",
-        "ALTER TABLE audits ADD COLUMN stamp_status TEXT",
-        "ALTER TABLE audits ADD COLUMN iot_status TEXT DEFAULT 'GPS Active (On Schedule)'",
-        "ALTER TABLE audits ADD COLUMN cfo_approval TEXT DEFAULT 'Pending CFO Sign-off'",
-        "ALTER TABLE audits ADD COLUMN review_status TEXT DEFAULT 'Pending Review'",
-        "ALTER TABLE audits ADD COLUMN audit_hash TEXT",
-        "ALTER TABLE audits ADD COLUMN workspace TEXT DEFAULT 'Default Corp'"
-    ]
-    
-    for mig in migrations:
-        try:
-            with engine.begin() as conn:
-                conn.execute(sqlalchemy.text(mig))
-        except Exception:
-            pass
-
-    with engine.begin() as conn:
-        result = conn.execute(sqlalchemy.text("SELECT * FROM users WHERE username = 'admin'")).fetchone()
-        if not result:
-            hashed_pwd = make_hashes("password123")
-            conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role, workspace, mfa_code, subscription_tier) VALUES (:u, :p, :r, :w, :m, :s)"),
-                       {"u": "admin", "p": hashed_pwd, "r": "Admin", "w": "Global Logistics Hub", "m": "1234", "s": "Enterprise"})
-
+# --- Initialize Database ---
 init_db()
 
-def log_activity(username, workspace, action, target_id="N/A"):
-    try:
-        with engine.begin() as conn:
-            conn.execute(sqlalchemy.text("""
-                INSERT INTO activity_logs (username, workspace, action, target_id)
-                VALUES (:u, :w, :a, :t)
-            """), {"u": username, "w": workspace, "a": action, "t": str(target_id)})
-    except Exception as e:
-        st.toast(f"⚠️ Activity Log Warning: {e}", icon="⚠️")
+# --- Apply UI Styling ---
+st.markdown(get_styles_css(), unsafe_allow_html=True)
 
-# --- Centralized Data Caching for Zero Latency Navigation ---
-@st.cache_data(ttl=60, show_spinner=False)
-def get_workspace_audits(workspace):
-    if not workspace:
-        return pd.DataFrame()
-    try:
-        return pd.read_sql(
-            sqlalchemy.text("SELECT * FROM audits WHERE workspace = :w ORDER BY timestamp DESC"),
-            engine, params={"w": workspace}
-        )
-    except Exception as e:
-        st.error(f"Database Read Error: {e}")
-        return pd.DataFrame()
+# --- Sidebar Logo ---
+st.sidebar.markdown(get_logo_html(), unsafe_allow_html=True)
 
-# --- Subscription & Billing Management ---
-@st.cache_data(ttl=15, show_spinner=False)
-def get_user_sub_info(username):
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(sqlalchemy.text("SELECT subscription_tier, invoices_processed FROM users WHERE username = :u"), {"u": username}).fetchone()
-            if result:
-                return result[0], result[1]
-    except Exception:
-        pass
-    return "Free", 0
-
-def increment_usage(username, count):
-    try:
-        with engine.begin() as conn:
-            conn.execute(sqlalchemy.text("UPDATE users SET invoices_processed = invoices_processed + :c WHERE username = :u"), {"c": count, "u": username})
-        st.cache_data.clear()
-    except Exception as e:
-        st.toast(f"Usage Increment Error: {e}", icon="❌")
-
-def upgrade_tier(username, new_tier):
-    try:
-        with engine.begin() as conn:
-            conn.execute(sqlalchemy.text("UPDATE users SET subscription_tier = :t WHERE username = :u"), {"t": new_tier, "u": username})
-        st.cache_data.clear()
-        st.toast(f"Workspace upgraded successfully to {new_tier}!", icon="💎")
-    except Exception as e:
-        st.error(f"Failed to upgrade tier: {e}")
-
-PLAN_LIMITS = {
-    "Free": 5,
-    "Pro": 50,
-    "Enterprise": float('inf')
-}
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def create_paddle_checkout(plan_name, price_id, current_username):
-    if not PADDLE_API_KEY or not price_id:
-        return None
-    try:
-        headers = {
-            "Authorization": f"Bearer {PADDLE_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "items": [{"price_id": price_id, "quantity": 1}],
-            "custom_data": {"username": current_username}
-        }
-        res = requests.post("https://api.paddle.com/transactions", json=payload, headers=headers, timeout=4)
-        if res.status_code == 201:
-            data = res.json()
-            return data["data"]["checkout"]["url"]
-    except Exception as e:
-        st.toast(f"Payment gateway connection timeout: {e}", icon="⚠️")
-    return None
-
-def send_email_alert(recipient_email, filename, audit_status, container_no):
-    if "email" in st.secrets:
-        try:
-            smtp_server = st.secrets["email"]["smtp_server"]
-            smtp_port = int(st.secrets["email"]["smtp_port"])
-            sender_email = st.secrets["email"]["sender_email"]
-            sender_password = st.secrets["email"]["sender_password"]
-
-            msg = MIMEMultipart()
-            msg['From'] = sender_email
-            msg['To'] = recipient_email
-            msg['Subject'] = f"🚨 LOGISTICS ALERT: Financial Discrepancy Detected ({filename})"
-
-            body = f"""
-            Dear Auditor,
-
-            An automated financial audit discrepancy has been flagged by the Logistics Engine:
-
-            • File Name: {filename}
-            • Container No: {container_no}
-            • Audit Status: {audit_status}
-
-            Action Required: Please log into the Enterprise Logistics Portal to review and process this issue.
-            """
-            msg.attach(MIMEText(body, 'plain'))
-
-            server = smtplib.SMTP(smtp_server, smtp_port, timeout=5)
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-            server.quit()
-            return True
-        except Exception as e:
-            st.toast(f"SMTP Alert Dispatch Failed: {e}", icon="⚠️")
-            return False
-    return False
-
-def send_automated_report(recipient_email, df):
-    pdf_buffer = generate_executive_pdf(df, "Automated Weekly Executive Report")
-    if "email" in st.secrets:
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = st.secrets["email"]["sender_email"]
-            msg['To'] = recipient_email
-            msg['Subject'] = "📊 Logistics SaaS: Automated Executive Report"
-            msg.attach(MIMEText("Please find attached your weekly logistics audit report.", 'plain'))
-            
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(pdf_buffer.getvalue())
-            encoders.encode_base64(part)
-            part.add_header('Content-Disposition', "attachment; filename=executive_report.pdf")
-            msg.attach(part)
-            
-            server = smtplib.SMTP(st.secrets["email"]["smtp_server"], int(st.secrets["email"]["smtp_port"]), timeout=5)
-            server.starttls()
-            server.login(st.secrets["email"]["sender_email"], st.secrets["email"]["sender_password"])
-            server.send_message(msg)
-            server.quit()
-            return True
-        except Exception:
-            return False
-    return False
-
-@st.cache_data(ttl=60, show_spinner=False)
-def fetch_live_carrier_tracking(tracking_id, carrier="DHL"):
-    if "carrier_api" in st.secrets and carrier.lower() in st.secrets["carrier_api"]:
-        try:
-            api_url = st.secrets["carrier_api"][carrier.lower()]["url"] + f"/{tracking_id}"
-            headers = {"Authorization": f"Bearer {st.secrets['carrier_api'][carrier.lower()]['token']}"}
-            response = requests.get(api_url, headers=headers, timeout=3)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("status", "In Transit (Live API Synced)")
-        except Exception:
-            pass
-    return f"Live {carrier} Satellite GPS: In Transit (On Schedule)"
-
-def add_user(username, password, role="Auditor", workspace="Default Corp", mfa_code="1234"):
-    try:
-        with engine.begin() as conn:
-            conn.execute(sqlalchemy.text("INSERT INTO users (username, password, role, workspace, mfa_code, subscription_tier, invoices_processed) VALUES (:u, :p, :r, :w, :m, 'Free', 0)"),
-                       {"u": username, "p": make_hashes(password), "r": role, "w": workspace, "m": mfa_code})
-        st.cache_data.clear()
-        return True
-    except Exception:
-        return False
-
-def login_user(username, password, mfa_input):
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(sqlalchemy.text("SELECT password, role, workspace, mfa_code FROM users WHERE username = :u"), {"u": username.strip()}).fetchone()
-            if result:
-                stored_password, role, workspace, stored_mfa = result
-                if stored_password == make_hashes(password) and (not stored_mfa or mfa_input.strip() == stored_mfa or mfa_input.strip() == "1234"):
-                    return role, workspace
-    except Exception:
-        pass
-    return None, None
-
-def save_to_db(record, username, workspace):
-    try:
-        record_str = f"{record['Filename']}-{record['Tracking ID']}-{record['Container No']}-{record['Audit Status']}-{workspace}"
-        audit_hash = hashlib.sha256(record_str.encode('utf-8')).hexdigest()
-        
-        with engine.begin() as conn:
-            conn.execute(sqlalchemy.text("""
-                INSERT INTO audits (filename, tracking_id, container_no, port, hs_code, stamp_status, iot_status, cfo_approval, date, currency, status, review_status, audit_hash, workspace, username)
-                VALUES (:f, :t, :c, :p, :hs, :st, :iot, :cfo, :d, :cur, :s, :rs, :h, :w, :u)
-            """), {
-                "f": record["Filename"],
-                "t": record["Tracking ID"],
-                "c": record["Container No"],
-                "p": record["Port of Discharge"],
-                "hs": record["HS Code"],
-                "st": record["Stamp & Signature Status"],
-                "iot": "GPS Active (Live Synced)",
-                "cfo": "Approved by CFO",
-                "d": record["Date"],
-                "cur": record["Currency"],
-                "s": record["Audit Status"],
-                "rs": "Pending Review",
-                "h": audit_hash,
-                "w": workspace,
-                "u": username
-            })
-        log_activity(username, workspace, "SAVE_AUDIT_RECORD", record["Filename"])
-        st.cache_data.clear()
-    except Exception as e:
-        st.error(f"Database Persistence Error: {e}")
-
-def generate_executive_pdf(df, title_text):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-    elements = []
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('ExecutiveTitle', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#1f2937'), spaceAfter=12, alignment=1)
-    subtitle_style = ParagraphStyle('ExecutiveSubtitle', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#4b5563'), spaceAfter=20, alignment=1)
-    
-    elements.append(Paragraph("<b>LOGISTICS SAAS - EXECUTIVE AUDIT REPORT</b>", title_style))
-    elements.append(Paragraph(f"{title_text}", subtitle_style))
-    elements.append(Spacer(1, 10))
-    
-    table_data = [list(df.columns)]
-    for _, row in df.iterrows():
-        table_data.append([str(val) for val in row.values])
-        
-    t = Table(table_data, repeatRows=1)
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2563eb')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f9fafb')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('TOPPADDING', (0, 1), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-    ]))
-    
-    elements.append(t)
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-def generate_dispute_letter_pdf(filename, tracking_id, container_no, status):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
-    elements = []
-    
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('DisputeTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#2563eb'), spaceAfter=15, alignment=1)
-    body_style = ParagraphStyle('DisputeBody', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#1f2937'), spaceAfter=12, leading=16)
-    
-    elements.append(Paragraph("<b>FORMAL FINANCIAL DISPUTE NOTICE</b>", title_style))
-    elements.append(Paragraph("<b>To:</b> Vendor / Carrier Billing Department", body_style))
-    elements.append(Paragraph(f"<b>Subject:</b> Notice of Financial Discrepancy & Chargeback Request for Container: <b>{container_no}</b>", body_style))
-    elements.append(Spacer(1, 10))
-    
-    letter_text = f"""
-    Dear Billing & Operations Management,<br/><br/>
-    This formal notice serves to inform you that our automated enterprise logistics auditing engine has detected a financial discrepancy in invoice file <b>{filename}</b> associated with Tracking ID <b>{tracking_id}</b>.<br/><br/>
-    Audit Finding Status: <b>{status}</b>.<br/><br/>
-    As per our master service agreement and contracted benchmark caps, the charges billed exceed our agreed rates. We hereby request an immediate financial review, credit note issuance, or invoice correction within 5 business days.<br/><br/>
-    Sincerely,<br/>
-    <b>Enterprise Logistics Auditing Department</b>
-    """
-    elements.append(Paragraph(letter_text, body_style))
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-query_params = st.query_params
-if "payment_success" in query_params and query_params.get("payment_success") == "true":
-    paid_plan = query_params.get("plan")
-    paid_user = query_params.get("user")
-    if paid_plan and paid_user:
-        upgrade_tier(paid_user, paid_plan)
-        st.success(f"🎉 Payment Successful! Account '{paid_user}' upgraded to {paid_plan} Tier.")
-        st.balloons()
-        st.query_params.clear()
-
-LANGUAGES = {
-    "English": {
-        "login_title": "🔐 Enterprise SSO & MFA Secure Login",
-        "login_sub": "Corporate Login with Multi-Factor Authentication",
-        "reg_sub": "Create a new corporate account",
-        "main_title": "📦 Logistics Invoice Auditor & Database Engine",
-        "main_desc": "Upload multiple logistics invoices for automated high-speed batch processing, strict contract auditing, and secure enterprise database logging.",
-        
-        "cat_ops": "📥 Core Operations / العمليات الأساسية",
-        "cat_fin": "💼 Finance & Billing / المالية والفوترة",
-        "cat_rep": "📊 Analytics & Reports / التقارير والتحليلات",
-        "cat_sys": "⚙️ System & Integration / النظام والربط",
-
-        "nav_process": "Process & Audit Invoices",
-        "nav_review": "Manual Review Queue",
-        "nav_iot": "IoT GPS & Live Carrier Tracking",
-        
-        "nav_billing": "💎 Billing & Subscriptions",
-        "nav_dispute": "Automated Dispute Letter Generator",
-        "nav_workflow": "Multi-Tier CFO Approval",
-        
-        "nav_history": "Audit Database History",
-        "nav_kpi": "Analytics, KPIs & AI Forecasting",
-        "nav_alerts": "Automated Alerts & Notifications",
-        "nav_scheduler": "Automated Email Scheduler",
-        
-        "nav_voice": "AI Voice & Text Assistant",
-        "nav_vendor": "Vendor Risk Assessment",
-        "nav_tariff": "AI Customs Tariff & HS Classifier",
-        "nav_erp": "ERP & Webhook Integration",
-    },
-    "العربية": {
-        "login_title": "🔐 تسجيل الدخول الآمن للمؤسسات (SSO & MFA)",
-        "login_sub": "تسجيل الدخول المؤسسي مع المصادقة الثنائية",
-        "reg_sub": "إنشاء حساب مؤسسي جديد",
-        "main_title": "📦 محرك تدقيق فواتير الشحن وقاعدة البيانات",
-        "main_desc": "قم برفع فواتير الشحن المتعددة للمعالجة الآلية السريعة، التدقيق الصارم، وحفظ السجلات في قاعدة البيانات السحابية.",
-        
-        "cat_ops": "📥 العمليات الأساسية",
-        "cat_fin": "💼 الإدارة المالية والفوترة",
-        "cat_rep": "📊 التحليلات والتقارير",
-        "cat_sys": "⚙️ النظام والربط الذكي",
-
-        "nav_process": "معالجة وتدقيق الفواتير",
-        "nav_review": "قائمة المراجعة البشرية",
-        "nav_iot": "تتبع الحاويات الحي (IoT & Carrier API)",
-        
-        "nav_billing": "💎 الفوترة والاشتراكات التجارية",
-        "nav_dispute": "منشئ خطابات النزاع القانوني",
-        "nav_workflow": "سير موافقات المدير المالي (CFO)",
-        
-        "nav_history": "سجلات قاعدة البيانات التدقيقية",
-        "nav_kpi": "لوحة التحليلات والتنبؤ المالي (KPIs)",
-        "nav_alerts": "مركز التنبيهات الآلية",
-        "nav_scheduler": "جدولة وتنزيل التقارير الآلية",
-        
-        "nav_voice": "المساعد الصوتي والتحليلي الذكي",
-        "nav_vendor": "تقييم مخاطر الموردين",
-        "nav_tariff": "محلل الرسوم الجمركية والتصنيف الذكي (HS)",
-        "nav_erp": "ربط أنظمة الـ ERP والـ Webhooks",
-    }
-}
-
-# --- UI Styling Theme (Anti-Flash Dark Mode Lock & Smooth Transitions) ---
-st.markdown("""
-    <style>
-    /* 🔴 HIDDEN DEFAULT PAGE NAVIGATION 🔴 */
-    [data-testid="stSidebarNav"] {
-        display: none !important;
-    }
-
-    html, body, [data-testid="stApp"], .stApp {
-        background-color: #030712 !important;
-        color: #f8fafc !important;
-    }
-
-    [data-testid="InputInstructions"], 
-    div[data-testid="stFormSubmitInstructions"],
-    .st-emotion-cache-1kyxreq,
-    small {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-    }
-
-    :root {
-        --primary-color: #2563eb !important;
-        --background-color: #030712 !important;
-        --secondary-background-color: #0f172a !important;
-        --text-color: #f8fafc !important;
-    }
-    
-    [data-testid="stViewToolbar"] {
-        background-color: #030712 !important;
-        color: #f8fafc !important;
-    }
-    .stApp {
-        background-image: radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.18) 0%, transparent 45%),
-                         radial-gradient(circle at 90% 90%, rgba(59, 130, 246, 0.12) 0%, transparent 45%);
-    }
-    h1, h2, h3, h4, h5, h6, p, span, label, div {
-        color: #f8fafc !important;
-    }
-    
-    /* Interactive custom container for sidebar logo button */
-    .custom-logo-container {
-        border-radius: 12px;
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%);
-        backdrop-filter: blur(10px);
-        color: white;
-        border: none;
-        padding: 14px 16px;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        text-align: center;
-        cursor: pointer;
-        margin-bottom: -0.5rem;
-    }
-    .custom-logo-container:hover {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-        transform: translateY(-1px);
-    }
-
-    .about-logo-container {
-        width: 380px;
-        margin: 0 auto 1.5rem auto;
-        padding: 10px;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        cursor: pointer;
-        display: block;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .about-logo-container:hover {
-        transform: scale(1.03);
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-    .about-logo-container svg {
-        transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .about-logo-container:hover svg {
-        filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.8)) drop-shadow(0 0 5px rgba(16, 185, 129, 0.6));
-    }
-
-    .stButton > button, 
-    [data-testid="baseButton-primary"], 
-    [data-testid="baseButton-secondary"],
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapseButton"],
-    button[kind="header"],
-    [data-testid="stFileUploader"] button {
-        border-radius: 12px !important;
-        font-weight: 700 !important;
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.8) 0%, rgba(29, 78, 216, 0.9) 100%) !important;
-        backdrop-filter: blur(10px) !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    }
-
-    .stButton > button:hover, 
-    [data-testid="collapsedControl"]:hover,
-    [data-testid="stSidebarCollapseButton"]:hover,
-    button[kind="header"]:hover,
-    [data-testid="stFileUploader"] button:hover {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        box-shadow: 0 0 25px rgba(59, 130, 246, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-        transform: translateY(-1px) !important;
-        outline: none !important;
-    }
-
-    div[data-baseweb="spinbutton"] button, 
-    .stNumberInput button {
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(29, 78, 216, 1) 100%) !important;
-        border-radius: 8px !important;
-        color: white !important;
-        border: none !important;
-        margin: 0 4px !important;
-        padding: 2px 8px !important;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
-        transition: all 0.2s ease !important;
-    }
-
-    div[data-baseweb="spinbutton"] button:hover, 
-    .stNumberInput button:hover {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.8) !important;
-        transform: scale(1.05) !important;
-    }
-
-    [data-baseweb="input"], 
-    [data-baseweb="base-input"], 
-    [data-baseweb="select"] > div {
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 12px !important;
-        background-color: rgba(15, 23, 42, 0.7) !important;
-        outline: none !important;
-    }
-    
-    [data-baseweb="input"]:focus-within, 
-    [data-baseweb="base-input"]:focus-within, 
-    [data-baseweb="select"] > div:focus-within,
-    [data-baseweb="input"]:hover, 
-    [data-baseweb="base-input"]:hover, 
-    [data-baseweb="select"] > div:hover {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.6) !important;
-        outline: none !important;
-    }
-    
-    *:focus {
-        outline: none !important;
-    }
-
-    input, select, textarea, div[data-baseweb="select"] span {
-        background-color: transparent !important;
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-    }
-    
-    div[data-baseweb="select"] svg {
-        fill: white !important;
-        color: white !important;
-    }
-
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        z-index: 99999 !important;
-    }
-    
-    [data-testid="collapsedControl"] {
-        display: flex !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        position: fixed !important;
-        top: 15px !important;
-        left: 15px !important;
-        z-index: 1000000 !important;
-        padding: 6px !important;
-    }
-    [data-testid="collapsedControl"] svg, button[kind="header"] svg, [data-testid="stSidebarCollapseButton"] svg {
-        fill: white !important;
-        color: white !important;
-    }
-
-    section[data-testid="stSidebar"] {
-        background-color: rgba(10, 15, 30, 0.9) !important;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-right: none !important;
-        box-shadow: 5px 0 30px rgba(37, 99, 235, 0.15);
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- Helper function for category & radio key mapping ---
-def get_category_and_radio_key(mode_name, lang_dict):
-    ops_list = [lang_dict["nav_process"], lang_dict["nav_review"], lang_dict["nav_iot"]]
-    fin_list = [lang_dict["nav_billing"], lang_dict["nav_dispute"], lang_dict["nav_workflow"]]
-    rep_list = [lang_dict["nav_kpi"], lang_dict["nav_alerts"], lang_dict["nav_history"], lang_dict["nav_scheduler"]]
-    sys_list = [lang_dict["nav_voice"], "Vendor Risk Assessment", lang_dict["nav_tariff"], lang_dict["nav_erp"]]
-    
-    if mode_name in ops_list:
-        return lang_dict["cat_ops"], "radio_ops"
-    elif mode_name in fin_list:
-        return lang_dict["cat_fin"], "radio_fin"
-    elif mode_name in rep_list:
-        return lang_dict["cat_rep"], "radio_rep"
-    elif mode_name in sys_list:
-        return lang_dict["cat_sys"], "radio_sys"
-    return lang_dict["cat_ops"], "radio_ops"
-
-# --- Sidebar Logo & Click Trigger Setup ---
-logo_html = f"""
-<div style="text-decoration: none; display: block; margin-bottom: 1rem;">
-    <div class="custom-logo-container">
-        <div style="display: flex; align-items: center; justify-content: center;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="100%" height="58">
-                <defs>
-                    <linearGradient id="primaryGradBtn" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#3b82f6" />
-                        <stop offset="100%" stop-color="#1d4ed8" />
-                    </linearGradient>
-                    <linearGradient id="accentGradBtn" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#10b981" />
-                        <stop offset="100%" stop-color="#059669" />
-                    </linearGradient>
-                </defs>
-                <g transform="translate(10, -2) scale(1.15)">
-                    <path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBtn)" stroke-width="4" stroke-linejoin="round" />
-                    <path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBtn)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-                    <line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-                    <line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-                    <circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-                    <path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBtn)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                </g>
-                <text x="120" y="74" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="800" fill="#f8fafc">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="18" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-            </svg>
-        </div>
-    </div>
-</div>
-"""
-st.sidebar.markdown(logo_html, unsafe_allow_html=True)
-
-# Hidden button linked to logo click handling
+# Hidden button for logo click handling
 if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
     if st.session_state["view"] == "dashboard":
         st.session_state["return_category"] = st.session_state.get("current_active_category")
@@ -822,97 +126,34 @@ if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
         st.session_state["restoring_dashboard"] = True
     st.rerun()
 
-# This guarantees NO raw text leakage by rendering as a continuous invisible block
-st.sidebar.markdown("""<div style='display:none;'><img src='x' onerror="setTimeout(()=>{let c=document.querySelector('.custom-logo-container');let b=Array.from(document.querySelectorAll('button')).find(x=>x.innerText.includes('Toggle_Logo_Hidden'));if(b){let p=b.closest('[data-testid=\\'stElementContainer\\']');if(p)p.style.display='none';}if(c&&b){c.style.cursor='pointer';c.onclick=()=>b.click();}},50);"></div>""", unsafe_allow_html=True)
+# Logo click handler JS
+st.sidebar.markdown(get_logo_click_handler_js(), unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 
+# --- Language Selection ---
 st.sidebar.markdown("🌐 **Language / اللغة**")
-selected_lang = st.sidebar.selectbox("Choose Language", ["English", "العربية"], label_visibility="collapsed", key="selected_lang")
+selected_lang = st.sidebar.selectbox(
+    "Choose Language",
+    ["English", "العربية"],
+    label_visibility="collapsed",
+    key="selected_lang"
+)
 lang = LANGUAGES[selected_lang]
 
-# --- Legal & Pricing Section placed directly under Language Selection ---
+# --- Legal & Pricing Section ---
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📄 Legal & Pricing")
 legal_mode = st.sidebar.radio(
-    "Legal Pages", 
-    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"], 
+    "Legal Pages",
+    ["App Dashboard", "Pricing", "Privacy Policy", "Refund Policy", "Terms of Service"],
     label_visibility="collapsed",
     key="legal_selection"
 )
 
-# --- Explanation Page View Handler ---
+# --- About Page View Handler ---
 if st.session_state["view"] == "about":
-    st.markdown("""<div style="text-align: center; padding: 2rem 1rem 1rem 1rem;">
-<div id="about-main-logo" class="about-logo-container" style="cursor: pointer;">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
-<defs>
-<linearGradient id="primaryGradBig" x1="0%" y1="0%" x2="100%" y2="100%">
-<stop offset="0%" stop-color="#3b82f6" />
-<stop offset="100%" stop-color="#1d4ed8" />
-</linearGradient>
-<linearGradient id="accentGradBig" x1="0%" y1="0%" x2="100%" y2="0%">
-<stop offset="0%" stop-color="#10b981" />
-<stop offset="100%" stop-color="#059669" />
-</linearGradient>
-</defs>
-<g transform="translate(120, 4) scale(1.05)">
-<path d="M40 10 L70 25 L70 65 L40 80 L10 65 L10 25 Z" fill="none" stroke="url(#primaryGradBig)" stroke-width="4" stroke-linejoin="round" />
-<path d="M40 10 L40 50 M70 25 L40 50 L10 25" fill="none" stroke="url(#primaryGradBig)" stroke-width="3" stroke-linejoin="round" opacity="0.6" />
-<line x1="25" y1="42" x2="35" y2="47" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-<line x1="45" y1="62" x2="55" y2="57" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-<circle cx="55" cy="55" r="18" fill="#030712" stroke="#10b981" stroke-width="3" />
-<path d="M47 55 L52 60 L63 48" fill="none" stroke="url(#accentGradBig)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-</g>
-<text x="160" y="108" font-family="system-ui, -apple-system, sans-serif" font-size="17" font-weight="800" fill="#f8fafc" text-anchor="middle">Logi<tspan fill="#3b82f6">Audit</tspan> <tspan font-size="11" font-weight="500" fill="#94a3b8">SaaS ENGINE</tspan></text>
-</svg>
-</div>
-<h1 style="font-size: 2.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 1rem;">Automated Logistics & Freight Auditing Engine</h1>
-<p style="font-size: 1.1rem; color: #94a3b8; max-width: 750px; margin: 0 auto 3rem auto; line-height: 1.6;">
-LogiAudit is an enterprise-grade SaaS platform designed to stop financial leakage in your supply chain. By leveraging AI-powered OCR and intelligent matching, we automatically audit your freight invoices, detect overcharges, and ensure compliance with your contracted rates.
-</p>
-</div>""", unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">🤖 AI-Powered Extraction</h3>
-                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
-                    Automatically extract tracking IDs, container numbers, and ocean freight costs from complex PDF invoices in seconds with zero manual data entry.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with col2:
-        st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">💰 Financial Protection</h3>
-                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
-                    Instantly flag discrepancies where billed amounts exceed your master service agreement (MSA) caps. Stop paying for errors and overcharges.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with col3:
-        st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); padding: 30px; border-radius: 16px; height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">⚖️ Automated Disputes</h3>
-                <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.6;">
-                    Generate legal-grade dispute notices instantly to request credit notes and chargebacks from vendors. Syncs seamlessly with CFO workflows.
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-    with col_btn2:
-        if st.button("🚀 Enter Workspace Dashboard", use_container_width=True, type="primary"):
-            st.session_state["view"] = "dashboard"
-            st.session_state["restoring_dashboard"] = True
-            st.rerun()
+    render_about_page()
     st.stop()
 
 # --- Handle Restoring Previous Page State ---
@@ -928,9 +169,11 @@ if st.session_state.get("restoring_dashboard", False):
         st.session_state["radio_ops"] = lang["nav_process"]
     st.session_state["restoring_dashboard"] = False
 
-# --- Callback function to reset the Legal/Pricing menu automatically ---
-def reset_legal_view():
+
+def reset_legal_view() -> None:
+    """Reset the legal/pricing menu to App Dashboard."""
     st.session_state["legal_selection"] = "App Dashboard"
+
 
 st.sidebar.markdown("---")
 st.sidebar.header("📂 Navigation Categories")
@@ -944,86 +187,126 @@ category_choice = st.sidebar.selectbox(
 )
 
 if category_choice == lang["cat_ops"]:
-    app_mode = st.sidebar.radio("Ops Menu", [lang["nav_process"], lang["nav_review"], lang["nav_iot"]], key="radio_ops", on_change=reset_legal_view)
+    app_mode = st.sidebar.radio(
+        "Ops Menu",
+        [lang["nav_process"], lang["nav_review"], lang["nav_iot"]],
+        key="radio_ops",
+        on_change=reset_legal_view
+    )
 elif category_choice == lang["cat_fin"]:
-    app_mode = st.sidebar.radio("Fin Menu", [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]], key="radio_fin", on_change=reset_legal_view)
+    app_mode = st.sidebar.radio(
+        "Fin Menu",
+        [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]],
+        key="radio_fin",
+        on_change=reset_legal_view
+    )
 elif category_choice == lang["cat_rep"]:
-    app_mode = st.sidebar.radio("Rep Menu", [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]], key="radio_rep", on_change=reset_legal_view)
+    app_mode = st.sidebar.radio(
+        "Rep Menu",
+        [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"], lang["nav_scheduler"]],
+        key="radio_rep",
+        on_change=reset_legal_view
+    )
 else:
-    app_mode = st.sidebar.radio("Sys Menu", [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]], key="radio_sys", on_change=reset_legal_view)
+    app_mode = st.sidebar.radio(
+        "Sys Menu",
+        [lang["nav_voice"], "Vendor Risk Assessment", lang["nav_tariff"], lang["nav_erp"]],
+        key="radio_sys",
+        on_change=reset_legal_view
+    )
 
-# Actively track the current page so we can precisely restore it when clicking the logo
+# Track current page for logo click restore
 st.session_state["current_active_category"] = category_choice
 st.session_state["current_active_mode"] = app_mode
 
 st.sidebar.markdown("---")
 st.sidebar.header("🌍 Multi-Currency & Settings")
 selected_currency = st.sidebar.selectbox("Operating Currency", ["USD ($)", "JOD (JD)", "EUR (€)"])
-min_ocean_freight = st.sidebar.number_input("Min Allowed Ocean Freight", value=700.0)
-max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=3000.0)
+min_ocean_freight = st.sidebar.number_input("Min Allowed Ocean Freight", value=DEFAULT_MIN_OCEAN_FREIGHT)
+max_ocean_freight = st.sidebar.number_input("Max Allowed Ocean Freight", value=DEFAULT_MAX_OCEAN_FREIGHT)
 use_ai_engine = st.sidebar.checkbox("Enable OpenAI LLM Extractor", value=True)
-alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value="admin@logistics-saas.com")
+alert_email_recipient = st.sidebar.text_input("Send Alerts To (Email)", value=DEFAULT_ALERT_EMAIL)
 
-# --- Authentication Check (Allows Public Legal/Pricing Access for Paddle Reviewers) ---
+# --- Payment Success Handler ---
+query_params = st.query_params
+if "payment_success" in query_params and query_params.get("payment_success") == "true":
+    paid_plan = query_params.get("plan")
+    paid_user = query_params.get("user")
+    if paid_plan and paid_user:
+        upgrade_tier(paid_user, paid_plan)
+        st.success(f"🎉 Payment Successful! Account '{paid_user}' upgraded to {paid_plan} Tier.")
+        st.balloons()
+        st.query_params.clear()
+
+# --- Authentication Check ---
 if not st.session_state["logged_in"] and legal_mode == "App Dashboard":
     st.title(lang["login_title"])
-    st.info("💡 **Notice for Paddle Compliance Reviewers:** You are viewing the secure enterprise portal login screen. To examine public pricing, terms, and privacy policies, please use the sidebar menu under **Legal & Pricing**.")
-    
+    st.info(
+        "💡 **Notice for Paddle Compliance Reviewers:** You are viewing the secure enterprise "
+        "portal login screen. To examine public pricing, terms, and privacy policies, please "
+        "use the sidebar menu under **Legal & Pricing**."
+    )
+
     tab1, tab2 = st.tabs(["Login", "Register New Account"])
     with tab1:
         st.subheader(lang["login_sub"])
         with st.form("login_form"):
             l_user = st.text_input("Username")
             l_pass = st.text_input("Password", type="password")
-            l_mfa = st.text_input("MFA Security Code (Default: 1234)", value="1234")
+            l_mfa = st.text_input("MFA Security Code (if configured)", value="")
             submit_login = st.form_submit_button("Sign In Securely", type="primary")
-            
+
             if submit_login:
                 if l_user and l_pass:
-                    role, workspace = login_user(l_user, l_pass, l_mfa)
+                    role, workspace = login_user(l_user, l_pass, l_mfa if l_mfa else None)
                     if role:
                         st.session_state["logged_in"] = True
                         st.session_state["username"] = l_user.strip()
                         st.session_state["role"] = role
                         st.session_state["workspace"] = workspace
-                        
-                        with engine.connect() as conn:
-                            log_count = conn.execute(sqlalchemy.text("SELECT COUNT(*) FROM activity_logs WHERE username = :u AND action = 'USER_LOGIN'"), {"u": l_user.strip()}).scalar()
-                        
-                        if log_count == 0:
+
+                        login_count = get_login_count(l_user.strip())
+                        if login_count == 0:
                             st.toast(f"Welcome, {l_user.strip()}!", icon="👋")
                         else:
                             st.toast(f"Welcome back, {l_user.strip()}!", icon="👋")
-                            
+
                         log_activity(l_user.strip(), workspace, "USER_LOGIN")
                         st.rerun()
                     else:
                         st.error("Invalid Username, Password, or MFA Code.")
                 else:
                     st.warning("Please fill in all required login fields.")
-                
+
     with tab2:
         st.subheader(lang["reg_sub"])
         with st.form("register_form"):
             r_user = st.text_input("Choose Username")
-            r_pass = st.text_input("Choose Password", type="password")
+            r_pass = st.text_input("Choose Password (min 8 chars, must include letter and number)", type="password")
             r_role = st.selectbox("Account Role", ["Auditor", "Admin", "CFO", "Viewer"])
             r_workspace = st.text_input("Corporate Workspace Name", value="Global Logistics Hub")
-            r_mfa = st.text_input("Set 4-digit MFA Code", value="1234")
+            r_mfa = st.text_input("Set MFA Code (optional, for enhanced security)", value="")
             submit_reg = st.form_submit_button("Create Free Account")
-            
+
             if submit_reg:
                 if r_user and r_pass and r_workspace:
-                    success = add_user(r_user.strip(), r_pass, r_role, r_workspace.strip(), r_mfa.strip())
+                    success = add_user(
+                        r_user.strip(),
+                        r_pass,
+                        r_role,
+                        r_workspace.strip(),
+                        r_mfa.strip() if r_mfa.strip() else None
+                    )
                     if success:
                         log_activity(r_user.strip(), r_workspace.strip(), "USER_REGISTER")
                         st.toast("Free Account created successfully! Switch to Login.", icon="✅")
                     else:
-                        st.error("Username already exists.")
+                        st.error("Username already exists or password requirements not met.")
                 else:
-                    st.warning("Please fill in all fields.")
+                    st.warning("Please fill in all required fields.")
     st.stop()
 
+# --- Logged-in User Display ---
 if st.session_state["logged_in"]:
     user_tier, invoices_processed = get_user_sub_info(st.session_state["username"])
 
@@ -1039,204 +322,30 @@ if st.session_state["logged_in"]:
     st.title(lang["main_title"])
     st.write(lang["main_desc"])
 
-def extract_text_from_pdf(pdf_path):
-    text = ""
-    try:
-        reader = pypdf.PdfReader(pdf_path)
-        if len(reader.pages) > 0:
-            text = reader.pages[0].extract_text()
-    except Exception as e:
-        st.toast(f"PDF Parsing Warning: {e}", icon="⚠️")
-    if not text.strip():
-        try:
-            images = convert_from_path(pdf_path, poppler_path=POPPLER_PATH, first_page=1, last_page=1)
-            if images:
-                text = pytesseract.image_to_string(images[0])
-        except Exception as e:
-            st.toast(f"OCR Fallback Error: {e}", icon="❌")
-    return text
-
-def parse_invoice_with_ai(text, filename, currency):
-    data = {
-        "Filename": filename,
-        "Tracking ID": "Unknown",
-        "Container No": "Unknown",
-        "Port of Discharge": "Unknown",
-        "HS Code": "8471.30",
-        "Stamp & Signature Status": "✅ Verified & Stamped",
-        "Date": "Unknown",
-        "Currency": currency,
-        "Audit Status": "✅ Approved"
-    }
-    
-    if "openai" in st.secrets and use_ai_engine:
-        try:
-            client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
-            prompt = f"""
-            Extract precisely from invoice text: Tracking ID, Container No, Port of Discharge, HS Code, Stamp & Signature Status, Date, Ocean Freight, Customs Fee.
-            Invoice Text: {text[:1500]}
-            """
-            response = client.chat.completions.create(model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}], temperature=0, max_tokens=150, timeout=4)
-            ai_output = response.choices[0].message.content
-            
-            t_match = re.search(r"Tracking ID:\s*(.+)", ai_output, re.IGNORECASE)
-            c_match = re.search(r"Container No:\s*(.+)", ai_output, re.IGNORECASE)
-            if t_match: data["Tracking ID"] = t_match.group(1).strip()
-            if c_match: data["Container No"] = c_match.group(1).strip()
-        except Exception as e:
-            err_str = str(e)
-            if "429" in err_str or "quota" in err_str.lower():
-                st.toast("💡 AI quota reached. Seamlessly using high-speed regex extraction fallback.", icon="⚡")
-            else:
-                st.toast(f"⚠️ AI Notice: {e}", icon="ℹ️")
-            
-    track_match = re.search(r"Tracking ID:\s*(.+)", text, re.IGNORECASE)
-    cont_match = re.search(r"Container No:\s*(.+)", text, re.IGNORECASE)
-    if track_match: data["Tracking ID"] = track_match.group(1).strip()
-    if cont_match: data["Container No"] = cont_match.group(1).strip()
-    
-    freight_match = re.search(r"Ocean Freight.*?([\d,]+\.?\d*)", text, re.IGNORECASE)
-    if freight_match:
-        try:
-            val = float(freight_match.group(1).replace(",", ""))
-            if val > max_ocean_freight:
-                data["Audit Status"] = "⚠️ Freight Discrepancy (Above Max Cap)"
-            elif val < min_ocean_freight:
-                data["Audit Status"] = "⚠️ Freight Discrepancy (Below Min Floor)"
-        except Exception:
-            pass
-    return data
 
 @st.fragment
-def render_active_view(mode, legal_choice):
-    df_all = get_workspace_audits(st.session_state.get("workspace", ""))
+def render_active_view(mode: str, legal_choice: str) -> None:
+    """
+    Render the active view based on navigation mode and legal choice.
     
-    # Handle Legal & Pricing Pages Selected from Sidebar (Accessible Publicly)
+    Args:
+        mode: The current navigation mode.
+        legal_choice: The current legal page selection.
+    """
+    df_all = get_workspace_audits(st.session_state.get("workspace", ""))
+
+    # --- Legal & Pricing Pages ---
     if legal_choice == "Pricing":
-        st.subheader("🏷️ Pricing Rationale & Value Breakdown")
-        st.write("Understand how LogiAudit saves your business money, why our pricing tiers are structured the way they are, and why Enterprise is the ultimate choice for logistics leaders.")
-        st.markdown("---")
-        
-        st.markdown("### 💡 Why Our Pricing is Built for High ROI")
-        st.markdown("""
-        Unchecked logistics invoices contain an average of **3% to 8% in billing errors, duplicate line items, and overcharges**.
-        Catching just **one** ocean freight overcharge (typically $450 - $1,200 per container) completely pays for months of your subscription.
-        """)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(255, 255, 255, 0.1);">
-                <h3 style="color: #60a5fa; margin-top: 0;">Free Tier</h3>
-                <h2 style="color: white;">$0 <span style="font-size: 14px; color: gray;">/month</span></h2>
-                <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Zero-risk evaluation sandbox.</p>
-                <hr style="border-color: rgba(255, 255, 255, 0.1);">
-                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
-                <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
-                    <li>Test OCR extraction accuracy on your real PDF invoices.</li>
-                    <li>Verify container number & tracking ID detection.</li>
-                    <li>Experience instant automated audit checks with zero financial commitment.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with col2:
-            st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(37, 99, 235, 0.4);">
-                <h3 style="color: #3b82f6; margin-top: 0;">Pro Tier 🚀</h3>
-                <h2 style="color: white;">$150 <span style="font-size: 14px; color: gray;">/month</span></h2>
-                <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Financial protection for growing firms.</p>
-                <hr style="border-color: rgba(255, 255, 255, 0.1);">
-                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>Why $150/month?</b></p>
-                <p style="color: #cbd5e1; font-size: 0.85rem;">At just $3 per audited invoice, stopping a single $450 discrepancy yields a 300%+ ROI in your first week.</p>
-                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
-                <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
-                    <li>Process up to 50 invoices/month.</li>
-                    <li>Instant email notifications sent to auditors when rate limits are breached.</li>
-                    <li>Download legal dispute notices and executive PDF reports.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-            st.markdown("""
-            <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(16, 185, 129, 0.5); box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);">
-                <h3 style="color: #10b981; margin-top: 0;">Enterprise Tier 💎</h3>
-                <h2 style="color: white;">$500 <span style="font-size: 14px; color: gray;">/month</span></h2>
-                <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Complete enterprise supply chain automation.</p>
-                <hr style="border-color: rgba(255, 255, 255, 0.1);">
-                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>Why $500/month?</b></p>
-                <p style="color: #cbd5e1; font-size: 0.85rem;">Replaces manual data entry teams with automated real-time ERP webhooks and unlimited batch scanning.</p>
-                <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
-                <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
-                    <li><b>Unlimited Invoices</b> — zero cap on monthly audits.</li>
-                    <li>Direct ERP Webhook & API integration (SAP, Oracle, NetSuite).</li>
-                    <li>Dedicated account representative & 24/7 priority SLA.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("### ⚡ Pro vs. Enterprise: Why Enterprise is Superior")
-        
-        comp_df = pd.DataFrame({
-            "Capability / Feature": [
-                "Monthly Invoice Volume Cap",
-                "Cost per Audited Document",
-                "ERP & Webhook Auto-Sync",
-                "CFO Digital Approval Queue",
-                "Contract Rate Customization",
-                "Support & Service Level Agreement (SLA)",
-                "Dedicated Account Rep"
-            ],
-            "Pro Tier ($150/mo)": [
-                "50 Invoices / month",
-                "$3.00 per invoice",
-                "❌ Manual CSV/PDF Export Only",
-                "Standard Queue",
-                "Standard Benchmark Caps",
-                "Standard Email Support (24h response)",
-                "❌ Not Included"
-            ],
-            "Enterprise Tier ($500/mo) 💎": [
-                "♾️ Unlimited (Zero Limit)",
-                "Near $0.00 per invoice at volume",
-                "✅ Live Real-Time Webhooks & ERP Pipeline",
-                "Advanced CFO Sign-off Workflow",
-                "✅ Fully Custom MSA Rate Matrix & Rules",
-                "24/7 Priority SLA Response",
-                "✅ Dedicated Account Manager"
-            ]
-        })
-        st.table(comp_df)
+        _render_pricing_page()
         return
-
     elif legal_choice == "Privacy Policy":
-        st.subheader("🔒 Privacy Policy")
-        st.markdown("""
-        **LogiAudit SaaS Engine** respects your privacy and is committed to protecting your corporate data.
-        * **Data Collection:** We securely process uploaded invoices, container tracking IDs, and audit records solely for supply chain auditing and financial verification.
-        * **Data Security:** All data is encrypted at rest and in transit using industry-standard protocols.
-        * **Third-Party Sharing:** We do not sell or share your business data with unauthorized third parties.
-        """)
+        _render_privacy_page()
         return
-
     elif legal_choice == "Refund Policy":
-        st.subheader("💵 Refund & Cancellation Policy")
-        st.markdown("""
-        * **Subscription Cancellation:** You can cancel your Pro or Enterprise subscription at any time from your billing dashboard. Cancellation takes effect at the end of the current billing cycle.
-        * **Refunds:** Due to the digital nature of SaaS invoice processing and API consumption, subscription fees are generally non-refundable. However, refund requests made within 48 hours of initial purchase due to technical incompatibilities will be reviewed on a case-by-case basis.
-        """)
+        _render_refund_page()
         return
-
     elif legal_choice == "Terms of Service":
-        st.subheader("📜 Terms of Service")
-        st.markdown("""
-        By accessing and using **LogiAudit SaaS Engine**, you agree to the following terms:
-        * **Authorized Use:** You agree to use the platform solely for lawful enterprise logistics auditing and financial discrepancy detection.
-        * **Account Security:** You are responsible for maintaining the confidentiality of your login credentials and MFA codes.
-        * **Service Availability:** While we strive for 99.9% uptime, services may be subject to scheduled maintenance or unforeseen network interruptions.
-        """)
+        _render_terms_page()
         return
 
     if not st.session_state["logged_in"]:
@@ -1244,309 +353,615 @@ def render_active_view(mode, legal_choice):
 
     user_tier, invoices_processed = get_user_sub_info(st.session_state["username"])
 
-    # Standard App Navigation Modes (When 'App Dashboard' is selected)
+    # --- Standard App Navigation Modes ---
     if mode == lang["nav_process"]:
-        st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
-        
-        limit = PLAN_LIMITS[user_tier]
-        remaining = limit - invoices_processed
-        
-        if remaining <= 0:
-            st.error(f"🛑 Usage Limit Reached! Your {user_tier} plan allows {limit} invoices max. Please upgrade your account to continue auditing.")
-            st.info("Navigate to the 'Pricing' option under Legal & Pricing to upgrade.")
-        else:
-            st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
-            
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                input_method = st.radio("Select Input Method", ["Upload File (PDF/Image)", "Mobile Camera Capture"], horizontal=True)
-                
-            uploaded_files = []
-            if input_method == "Upload File (PDF/Image)":
-                uploaded_files = st.file_uploader("Choose invoice files (Multiple allowed)", type=["pdf", "png", "jpg"], accept_multiple_files=True)
-            else:
-                cam_file = st.camera_input("Capture Invoice with Mobile Camera")
-                if cam_file:
-                    uploaded_files = [cam_file]
-
-            if uploaded_files:
-                if len(uploaded_files) > remaining:
-                    st.error(f"⚠️ You are trying to upload {len(uploaded_files)} files, but you only have {remaining} scans left. Please upgrade.")
-                else:
-                    with st.spinner("🔄 Initializing OCR engine and parsing documents..."):
-                        batch_results = []
-                        discrepancy_alerts_count = 0
-                        emails_sent_count = 0
-                        
-                        for uploaded_file in uploaded_files:
-                            temp_file_path = f"temp_{getattr(uploaded_file, 'name', 'camera_capture.jpg')}"
-                            raw_text = ""
-                            if getattr(uploaded_file, 'type', '') == "application/pdf":
-                                with open(temp_file_path, "wb") as f:
-                                    f.write(uploaded_file.getbuffer())
-                                raw_text = extract_text_from_pdf(temp_file_path)
-                            else:
-                                try:
-                                    image = Image.open(uploaded_file)
-                                    raw_text = pytesseract.image_to_string(image)
-                                except Exception as e:
-                                    st.error(f"Image read error: {e}")
-                            
-                            fname = getattr(uploaded_file, 'name', 'mobile_capture.jpg')
-                            if raw_text.strip():
-                                parsed_data = parse_invoice_with_ai(raw_text, fname, selected_currency)
-                                save_to_db(parsed_data, st.session_state["username"], st.session_state["workspace"])
-                                batch_results.append(parsed_data)
-                                
-                                if parsed_data["Audit Status"] != "✅ Approved":
-                                    discrepancy_alerts_count += 1
-                                    if alert_email_recipient:
-                                        sent = send_email_alert(alert_email_recipient, parsed_data["Filename"], parsed_data["Audit Status"], parsed_data["Container No"])
-                                        if sent:
-                                            emails_sent_count += 1
-                        
-                        if batch_results:
-                            increment_usage(st.session_state["username"], len(batch_results))
-                            st.toast('Batch Sensor Auditing Complete!', icon='🎯')
-                            st.success("✅ Audit Engine processing finished successfully with robust error checking.")
-                            
-                            if discrepancy_alerts_count > 0:
-                                st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
-                                if emails_sent_count > 0:
-                                    st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
-                                    
-                            st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
-
+        _render_process_invoices(user_tier, invoices_processed)
     elif mode == lang["nav_billing"]:
-        st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
-        st.write("Upgrade your workspace to process more invoices, unlock advanced CFO workflows, and enable automated AI webhooks.")
-        
-        st.markdown("---")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
-                <h2 style="color: white;">Free Tier</h2>
-                <h1 style="color: #60a5fa;">$0<span style="font-size: 14px; color: gray;">/mo</span></h1>
-                <p>Perfect for testing.</p>
-                <hr style="border-color: rgba(96, 165, 250, 0.3);">
-                <ul style="text-align: left; color: white;">
-                    <li>5 Invoice Scans Total</li>
-                    <li>Basic Dashboard</li>
-                    <li>Community Support</li>
-                </ul>
-            </div>
-            <br>
-            """, unsafe_allow_html=True)
-            if user_tier == "Free":
-                st.button("Current Plan", disabled=True, key="btn_free_billing")
-                
-        with col2:
-            st.markdown("""
-            <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
-                <h2 style="color: white;">Pro Tier 🚀</h2>
-                <h1 style="color: #60a5fa;">$150<span style="font-size: 14px; color: gray;">/mo</span></h1>
-                <p>For growing logistics firms.</p>
-                <hr style="border-color: rgba(96, 165, 250, 0.3);">
-                <ul style="text-align: left; color: white;">
-                    <li>50 Invoice Scans / month</li>
-                    <li>PDF Executive Reports</li>
-                    <li>Priority Email Alerts</li>
-                    <li>Basic ERP Integrations</li>
-                </ul>
-            </div>
-            <br>
-            """, unsafe_allow_html=True)
-            if user_tier == "Pro":
-                st.button("Current Plan", disabled=True, key="btn_pro_cur_billing")
-            else:
-                checkout_url = create_paddle_checkout("Pro", PRO_PRICE_ID, st.session_state["username"])
-                if checkout_url:
-                    st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
-                else:
-                    st.warning("⚠️ Payment gateway currently unavailable.")
-
-        with col3:
-            st.markdown("""
-            <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
-                <h2 style="color: white;">Enterprise</h2>
-                <h1 style="color: #60a5fa;">$500<span style="font-size: 14px; color: gray;">/mo</span></h1>
-                <p>For global shipping hubs.</p>
-                <hr style="border-color: rgba(96, 165, 250, 0.3);">
-                <ul style="text-align: left; color: white;">
-                    <li><b>Unlimited</b> Invoice Scans</li>
-                    <li>Full ERP Webhook Access</li>
-                    <li>24/7 Dedicated Account Rep</li>
-                    <li>Custom SLA Agreements</li>
-                </ul>
-            </div>
-            <br>
-            """, unsafe_allow_html=True)
-            if user_tier == "Enterprise":
-                st.button("Current Plan", disabled=True, key="btn_ent_cur_billing")
-            else:
-                checkout_url_ent = create_paddle_checkout("Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"])
-                if checkout_url_ent:
-                    st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
-                else:
-                    st.warning("⚠️ Payment gateway currently unavailable.")
-
+        _render_billing_page(user_tier)
     elif mode == lang["nav_review"]:
-        st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
-        df_pending = df_all[df_all['review_status'] == 'Pending Review']
-        if not df_pending.empty:
-            for idx, row in df_pending.iterrows():
-                with st.expander(f"📁 File: {row['filename']} | 📦 Container: {row['container_no']} | 🚦 Status: {row['status']}"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        new_track = st.text_input(f"Tracking ID #{row['id']}", value=row['tracking_id'])
-                        new_cont = st.text_input(f"Container No #{row['id']}", value=row['container_no'])
-                    with col2:
-                        new_port = st.text_input(f"Port #{row['id']}", value=row['port'])
-                        new_status = st.selectbox(f"Audit Status #{row['id']}", ["✅ Approved", "⚠️ Freight Discrepancy", "⚠️ Customs Discrepancy"], index=0 if row['status']=="✅ Approved" else 1)
-                    
-                    if st.button(f"Verify & Commit Record #{row['id']}", key=f"btn_{row['id']}"):
-                        with engine.begin() as conn:
-                            conn.execute(sqlalchemy.text("UPDATE audits SET tracking_id = :t, container_no = :c, port = :p, status = :s, review_status = 'Verified' WHERE id = :id"), {"t": new_track, "c": new_cont, "p": new_port, "s": new_status, "id": row['id']})
-                        log_activity(st.session_state["username"], st.session_state["workspace"], "VERIFY_RECORD", row['id'])
-                        st.cache_data.clear()
-                        st.toast(f"Record #{row['id']} verified!", icon="💾")
-                        st.rerun()
-        else:
-            st.success("🎉 No pending invoices in your review queue. All records are verified!")
-
+        _render_review_queue(df_all)
     elif mode == lang["nav_dispute"]:
-        st.subheader("⚖️ Automated Dispute Letter Generator")
-        df_disputes = df_all[df_all['status'] != '✅ Approved']
-        if not df_disputes.empty:
-            for _, row in df_disputes.iterrows():
-                st.markdown(f"**File:** {row['filename']} | **Container:** {row['container_no']} | **Status:** {row['status']}")
-                pdf_dispute = generate_dispute_letter_pdf(row['filename'], row['tracking_id'], row['container_no'], row['status'])
-                st.download_button(label=f"📄 Download Legal Dispute Notice ({row['filename']})", data=pdf_dispute, file_name=f"dispute_notice_{row['container_no']}.pdf", mime='application/pdf', key=f"dispute_{row['id']}")
-                st.markdown("---")
-        else:
-            st.info("No flagged discrepancies found for dispute generation.")
-
+        _render_dispute_generator(df_all)
     elif mode == lang["nav_iot"]:
-        st.subheader("🛰️ IoT GPS & Live Carrier Tracking (DHL / Aramex API)")
-        carrier_choice = st.selectbox("Select Carrier for Live Tracking Query", ["DHL", "Aramex", "Maersk"])
-        query_track = st.text_input("Enter Tracking ID or Container No to Live Query")
-        if st.button("Query Live Carrier API"):
-            st.success(f"📡 API Response: {fetch_live_carrier_tracking(query_track, carrier_choice)}")
-            
-        if not df_all.empty:
-            df_iot = df_all[['container_no', 'port', 'date', 'status', 'iot_status']]
-            st.dataframe(df_iot, use_container_width=True)
-
+        _render_iot_tracking(df_all)
     elif mode == lang["nav_workflow"]:
-        st.subheader("👔 Multi-Tier CFO Approval Workflow")
-        if has_permission(st.session_state["role"], "approve_cfo"):
-            df_cfo = df_all[df_all['status'] != '✅ Approved']
-            if not df_cfo.empty:
-                for _, row in df_cfo.iterrows():
-                    st.markdown(f"**Container:** {row['container_no']} | **Status:** {row['status']} | **CFO Status:** {row['cfo_approval']}")
-                    if st.button(f"✍️ CFO Digital Sign & Approve #{row['id']}", key=f"cfo_{row['id']}"):
-                        with engine.begin() as conn:
-                            conn.execute(sqlalchemy.text("UPDATE audits SET cfo_approval = 'Approved by CFO' WHERE id = :id"), {"id": row['id']})
-                        log_activity(st.session_state["username"], st.session_state["workspace"], "CFO_APPROVE", row['id'])
-                        st.cache_data.clear()
-                        st.toast(f"Discrepancy #{row['id']} approved by CFO!", icon="✍️")
-                        st.rerun()
-            else:
-                st.success("🎉 No high-value discrepancies pending CFO approval.")
-        else:
-            st.warning("Unauthorized: Only CFO or Admin roles can access the approval workflow.")
-
+        _render_cfo_workflow(df_all)
     elif mode == lang["nav_voice"]:
-        st.subheader("🎙️ AI Voice & Text Audit Assistant")
-        user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
-        if st.button("Ask AI"):
-            if "leakage" in user_query.lower() or "هدر" in user_query.lower():
-                disc = len(df_all[df_all["status"] != "✅ Approved"])
-                st.info(f"🤖 AI Assistant: Based on your workspace database, you have {disc} flagged discrepancies with an estimated financial leakage impact of ${disc * 450:,.2f}.")
-            else:
-                st.info("🤖 AI Assistant: All workspace audit logs are synchronized and fully operational. No critical risks detected.")
-
+        _render_ai_assistant(df_all)
     elif mode == lang["nav_history"]:
-        st.subheader("🗄️ Enterprise Cloud Database Logs")
-        if not df_all.empty:
-            st.dataframe(df_all, use_container_width=True)
-            col_csv, col_pdf = st.columns(2)
-            with col_csv:
-                csv_history = df_all.to_csv(index=False).encode('utf-8')
-                st.download_button(label="📥 Download History (CSV)", data=csv_history, file_name='audit_history.csv', mime='text/csv')
-            with col_pdf:
-                pdf_buffer = generate_executive_pdf(df_all, f"Immutable Audit Trails - Workspace: {st.session_state['workspace']}")
-                st.download_button(label="📄 Download Executive Report (PDF)", data=pdf_buffer, file_name='audit_history_executive.pdf', mime='application/pdf')
-        else:
-            st.info("No historical records found.")
-
+        _render_audit_history(df_all)
     elif mode == lang["nav_kpi"]:
-        st.subheader("📈 Executive Logistics Analytics & KPIs")
-        if not df_all.empty:
-            total_audits = len(df_all)
-            approved_count = len(df_all[df_all["status"] == "✅ Approved"])
-            discrepancy_count = total_audits - approved_count
-            estimated_savings = discrepancy_count * 450.0
-            
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Total Invoices Audited", total_audits)
-            col2.metric("Approved Invoices", approved_count)
-            col3.metric("Discrepancies Flagged", discrepancy_count)
-            col4.metric("Estimated Cost Savings", f"${estimated_savings:,.2f}")
-            
-            st.markdown("---")
-            fig_pie = px.pie(df_all, names='status', title='Audit Status Breakdown', hole=0.4, color_discrete_sequence=['#10b981', '#2563eb', '#f59e0b'])
-            fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="white")
-            st.plotly_chart(fig_pie, use_container_width=True)
-        else:
-            st.info("No data available for analytics yet.")
-
+        _render_analytics(df_all)
     elif mode == lang["nav_alerts"]:
-        st.subheader("🚨 Automated Discrepancy Alerts Center")
-        df_alerts = df_all[df_all['status'] != '✅ Approved']
-        if not df_alerts.empty:
-            st.error(f"⚠️ Total Active Discrepancy Alerts Requiring Attention: {len(df_alerts)}")
-            st.dataframe(df_alerts, use_container_width=True)
-        else:
-            st.success("🎉 Outstanding! No discrepancy alerts found.")
-
+        _render_alerts(df_all)
     elif mode == lang["nav_scheduler"]:
-        st.subheader("📅 Automated Report Scheduler & Dispatcher")
-        if has_permission(st.session_state["role"], "schedule_reports"):
-            sched_email = st.text_input("Recipient Email for Scheduled Report", value="cfo@logistics-saas.com")
-            if st.button("🚀 Trigger & Send Immediate Executive Report"):
-                if send_automated_report(sched_email, df_all):
-                    log_activity(st.session_state["username"], st.session_state["workspace"], "SEND_SCHEDULED_REPORT", sched_email)
-                    st.success("✅ Executive Report dispatched successfully via email!")
-                else:
-                    st.error("❌ Failed to send report. Please verify SMTP settings in Streamlit Secrets.")
-        else:
-            st.warning("Unauthorized: Only CFO or Admin roles can schedule or trigger automated reports.")
-
+        _render_scheduler(df_all)
     elif mode == "Vendor Risk Assessment":
-        st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
-        if not df_all.empty:
-            df_vendor = df_all.groupby(['username', 'workspace', 'status']).size().reset_index(name='count')
-            st.dataframe(df_vendor, use_container_width=True)
-        else:
-            st.info("No vendor assessment data available yet.")
-
+        _render_vendor_assessment(df_all)
     elif mode == lang["nav_tariff"]:
-        st.subheader("🏷️ AI Customs Tariff & HS Code Auto-Classifier")
-        item_desc = st.text_input("Enter Goods Description (e.g., 'MacBook Pro M3 Laptop', 'Industrial Hydraulic Pump')")
-        if st.button("Calculate Tariff & Classify"):
-            st.success("✅ HS Code Classified: **8471.30 (Portable Digital Automatic Data Processing Machines)**")
-            st.info("Estimated Customs Duty: **5%** | Import VAT: **16%** | Standard Compliance: **Verified**")
-
+        _render_tariff_classifier()
     elif mode == lang["nav_erp"]:
-        st.subheader("🔌 ERP & Webhook Integrations")
-        webhook_url = st.text_input("Enterprise ERP Webhook Endpoint URL", value="https://api.yourcompany.com/erp/v1/webhooks/audit")
-        if st.button("🧪 Test Webhook & Sync Verified Audits"):
+        _render_erp_integration()
+
+
+def _render_pricing_page() -> None:
+    """Render the public pricing page."""
+    st.subheader("🏷️ Pricing Rationale & Value Breakdown")
+    st.write(
+        "Understand how LogiAudit saves your business money, why our pricing tiers are "
+        "structured the way they are, and why Enterprise is the ultimate choice for logistics leaders."
+    )
+    st.markdown("---")
+
+    st.markdown("### 💡 Why Our Pricing is Built for High ROI")
+    st.markdown("""
+    Unchecked logistics invoices contain an average of **3% to 8% in billing errors, duplicate line items, and overcharges**.
+    Catching just **one** ocean freight overcharge (typically $450 - $1,200 per container) completely pays for months of your subscription.
+    """)
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("""
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(255, 255, 255, 0.1);">
+            <h3 style="color: #60a5fa; margin-top: 0;">Free Tier</h3>
+            <h2 style="color: white;">$0 <span style="font-size: 14px; color: gray;">/month</span></h2>
+            <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Zero-risk evaluation sandbox.</p>
+            <hr style="border-color: rgba(255, 255, 255, 0.1);">
+            <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
+            <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
+                <li>Test OCR extraction accuracy on your real PDF invoices.</li>
+                <li>Verify container number & tracking ID detection.</li>
+                <li>Experience instant automated audit checks with zero financial commitment.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(37, 99, 235, 0.4);">
+            <h3 style="color: #3b82f6; margin-top: 0;">Pro Tier 🚀</h3>
+            <h2 style="color: white;">$150 <span style="font-size: 14px; color: gray;">/month</span></h2>
+            <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Financial protection for growing firms.</p>
+            <hr style="border-color: rgba(255, 255, 255, 0.1);">
+            <p style="color: #e2e8f0; font-size: 0.95rem;"><b>Why $150/month?</b></p>
+            <p style="color: #cbd5e1; font-size: 0.85rem;">At just $3 per audited invoice, stopping a single $450 discrepancy yields a 300%+ ROI in your first week.</p>
+            <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
+            <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
+                <li>Process up to 50 invoices/month.</li>
+                <li>Instant email notifications sent to auditors when rate limits are breached.</li>
+                <li>Download legal dispute notices and executive PDF reports.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(16, 185, 129, 0.15) 100%); padding: 22px; border-radius: 12px; height: 100%; border: 1px solid rgba(16, 185, 129, 0.5); box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);">
+            <h3 style="color: #10b981; margin-top: 0;">Enterprise Tier 💎</h3>
+            <h2 style="color: white;">$500 <span style="font-size: 14px; color: gray;">/month</span></h2>
+            <p style="color: #94a3b8; font-size: 0.9rem;"><b>Goal:</b> Complete enterprise supply chain automation.</p>
+            <hr style="border-color: rgba(255, 255, 255, 0.1);">
+            <p style="color: #e2e8f0; font-size: 0.95rem;"><b>Why $500/month?</b></p>
+            <p style="color: #cbd5e1; font-size: 0.85rem;">Replaces manual data entry teams with automated real-time ERP webhooks and unlimited batch scanning.</p>
+            <p style="color: #e2e8f0; font-size: 0.95rem;"><b>How It Helps You:</b></p>
+            <ul style="color: #cbd5e1; font-size: 0.85rem; padding-left: 1.2rem;">
+                <li><b>Unlimited Invoices</b> — zero cap on monthly audits.</li>
+                <li>Direct ERP Webhook & API integration (SAP, Oracle, NetSuite).</li>
+                <li>Dedicated account representative & 24/7 priority SLA.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### ⚡ Pro vs. Enterprise: Why Enterprise is Superior")
+
+    comp_df = pd.DataFrame({
+        "Capability / Feature": [
+            "Monthly Invoice Volume Cap",
+            "Cost per Audited Document",
+            "ERP & Webhook Auto-Sync",
+            "CFO Digital Approval Queue",
+            "Contract Rate Customization",
+            "Support & Service Level Agreement (SLA)",
+            "Dedicated Account Rep"
+        ],
+        "Pro Tier ($150/mo)": [
+            "50 Invoices / month",
+            "$3.00 per invoice",
+            "❌ Manual CSV/PDF Export Only",
+            "Standard Queue",
+            "Standard Benchmark Caps",
+            "Standard Email Support (24h response)",
+            "❌ Not Included"
+        ],
+        "Enterprise Tier ($500/mo) 💎": [
+            "♾️ Unlimited (Zero Limit)",
+            "Near $0.00 per invoice at volume",
+            "✅ Live Real-Time Webhooks & ERP Pipeline",
+            "Advanced CFO Sign-off Workflow",
+            "✅ Fully Custom MSA Rate Matrix & Rules",
+            "24/7 Priority SLA Response",
+            "✅ Dedicated Account Manager"
+        ]
+    })
+    st.table(comp_df)
+
+
+def _render_privacy_page() -> None:
+    """Render the privacy policy page."""
+    st.subheader("🔒 Privacy Policy")
+    st.markdown("""
+    **LogiAudit SaaS Engine** respects your privacy and is committed to protecting your corporate data.
+    * **Data Collection:** We securely process uploaded invoices, container tracking IDs, and audit records solely for supply chain auditing and financial verification.
+    * **Data Security:** All data is encrypted at rest and in transit using industry-standard protocols.
+    * **Third-Party Sharing:** We do not sell or share your business data with unauthorized third parties.
+    """)
+
+
+def _render_refund_page() -> None:
+    """Render the refund policy page."""
+    st.subheader("💵 Refund & Cancellation Policy")
+    st.markdown("""
+    * **Subscription Cancellation:** You can cancel your Pro or Enterprise subscription at any time from your billing dashboard. Cancellation takes effect at the end of the current billing cycle.
+    * **Refunds:** Due to the digital nature of SaaS invoice processing and API consumption, subscription fees are generally non-refundable. However, refund requests made within 48 hours of initial purchase due to technical incompatibilities will be reviewed on a case-by-case basis.
+    """)
+
+
+def _render_terms_page() -> None:
+    """Render the terms of service page."""
+    st.subheader("📜 Terms of Service")
+    st.markdown("""
+    By accessing and using **LogiAudit SaaS Engine**, you agree to the following terms:
+    * **Authorized Use:** You agree to use the platform solely for lawful enterprise logistics auditing and financial discrepancy detection.
+    * **Account Security:** You are responsible for maintaining the confidentiality of your login credentials and MFA codes.
+    * **Service Availability:** While we strive for 99.9% uptime, services may be subject to scheduled maintenance or unforeseen network interruptions.
+    """)
+
+
+def _render_process_invoices(user_tier: str, invoices_processed: int) -> None:
+    """Render the invoice processing page."""
+    st.subheader("📥 Bulk Invoice Uploader & AI Sensor")
+
+    limit = PLAN_LIMITS[user_tier]
+    remaining = limit - invoices_processed
+
+    if remaining <= 0:
+        st.error(
+            f"🛑 Usage Limit Reached! Your {user_tier} plan allows {limit} invoices max. "
+            "Please upgrade your account to continue auditing."
+        )
+        st.info("Navigate to the 'Pricing' option under Legal & Pricing to upgrade.")
+    else:
+        st.info(f"💡 You have {remaining} invoice scans remaining on your {user_tier} plan.")
+
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            input_method = st.radio(
+                "Select Input Method",
+                ["Upload File (PDF/Image)", "Mobile Camera Capture"],
+                horizontal=True
+            )
+
+        uploaded_files = []
+        if input_method == "Upload File (PDF/Image)":
+            uploaded_files = st.file_uploader(
+                "Choose invoice files (Multiple allowed)",
+                type=["pdf", "png", "jpg"],
+                accept_multiple_files=True
+            )
+        else:
+            cam_file = st.camera_input("Capture Invoice with Mobile Camera")
+            if cam_file:
+                uploaded_files = [cam_file]
+
+        if uploaded_files:
+            if len(uploaded_files) > remaining:
+                st.error(
+                    f"⚠️ You are trying to upload {len(uploaded_files)} files, "
+                    f"but you only have {remaining} scans left. Please upgrade."
+                )
+            else:
+                with st.spinner("🔄 Initializing OCR engine and parsing documents..."):
+                    batch_results = []
+                    discrepancy_alerts_count = 0
+                    emails_sent_count = 0
+                    temp_files_to_cleanup = []
+
+                    for uploaded_file in uploaded_files:
+                        temp_file_path = f"temp_{getattr(uploaded_file, 'name', 'camera_capture.jpg')}"
+                        raw_text = ""
+
+                        if getattr(uploaded_file, 'type', '') == "application/pdf":
+                            with open(temp_file_path, "wb") as f:
+                                f.write(uploaded_file.getbuffer())
+                            temp_files_to_cleanup.append(temp_file_path)
+                            raw_text = extract_text_from_pdf(temp_file_path)
+                        else:
+                            try:
+                                image = Image.open(uploaded_file)
+                                raw_text = pytesseract.image_to_string(image)
+                            except Exception:
+                                st.error("Unable to process image file")
+
+                        fname = getattr(uploaded_file, 'name', 'mobile_capture.jpg')
+                        if raw_text.strip():
+                            parsed_data = parse_invoice_with_ai(
+                                raw_text,
+                                fname,
+                                selected_currency,
+                                min_ocean_freight,
+                                max_ocean_freight,
+                                use_ai_engine
+                            )
+                            save_audit_record(
+                                parsed_data,
+                                st.session_state["username"],
+                                st.session_state["workspace"]
+                            )
+                            batch_results.append(parsed_data)
+
+                            if parsed_data["Audit Status"] != "✅ Approved":
+                                discrepancy_alerts_count += 1
+                                if alert_email_recipient and validate_email(alert_email_recipient):
+                                    sent = send_email_alert(
+                                        alert_email_recipient,
+                                        parsed_data["Filename"],
+                                        parsed_data["Audit Status"],
+                                        parsed_data["Container No"]
+                                    )
+                                    if sent:
+                                        emails_sent_count += 1
+
+                    # Cleanup temporary files
+                    for temp_file in temp_files_to_cleanup:
+                        cleanup_temp_file(temp_file)
+
+                    if batch_results:
+                        increment_usage(st.session_state["username"], len(batch_results))
+                        st.toast('Batch Sensor Auditing Complete!', icon='🎯')
+                        st.success("✅ Audit Engine processing finished successfully.")
+
+                        if discrepancy_alerts_count > 0:
+                            st.error(f"🚨 Automated Alert: {discrepancy_alerts_count} invoice(s) flagged with discrepancies!")
+                            if emails_sent_count > 0:
+                                st.info(f"📧 Notification Sent: {emails_sent_count} instant email alert(s) dispatched.")
+
+                        st.dataframe(pd.DataFrame(batch_results), use_container_width=True)
+
+
+def _render_billing_page(user_tier: str) -> None:
+    """Render the billing and subscriptions page."""
+    st.subheader("💎 Enterprise SaaS Billing & Subscriptions (Powered by Paddle)")
+    st.write(
+        "Upgrade your workspace to process more invoices, unlock advanced CFO workflows, "
+        "and enable automated AI webhooks."
+    )
+
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("""
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
+            <h2 style="color: white;">Free Tier</h2>
+            <h1 style="color: #60a5fa;">$0<span style="font-size: 14px; color: gray;">/mo</span></h1>
+            <p>Perfect for testing.</p>
+            <hr style="border-color: rgba(96, 165, 250, 0.3);">
+            <ul style="text-align: left; color: white;">
+                <li>5 Invoice Scans Total</li>
+                <li>Basic Dashboard</li>
+                <li>Community Support</li>
+            </ul>
+        </div>
+        <br>
+        """, unsafe_allow_html=True)
+        if user_tier == "Free":
+            st.button("Current Plan", disabled=True, key="btn_free_billing")
+
+    with col2:
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(29, 78, 216, 0.4) 100%); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 0 20px rgba(37,99,235,0.4);">
+            <h2 style="color: white;">Pro Tier 🚀</h2>
+            <h1 style="color: #60a5fa;">$150<span style="font-size: 14px; color: gray;">/mo</span></h1>
+            <p>For growing logistics firms.</p>
+            <hr style="border-color: rgba(96, 165, 250, 0.3);">
+            <ul style="text-align: left; color: white;">
+                <li>50 Invoice Scans / month</li>
+                <li>PDF Executive Reports</li>
+                <li>Priority Email Alerts</li>
+                <li>Basic ERP Integrations</li>
+            </ul>
+        </div>
+        <br>
+        """, unsafe_allow_html=True)
+        if user_tier == "Pro":
+            st.button("Current Plan", disabled=True, key="btn_pro_cur_billing")
+        else:
+            checkout_url = create_paddle_checkout(
+                "Pro", PRO_PRICE_ID, st.session_state["username"], PADDLE_API_KEY
+            )
+            if checkout_url:
+                st.link_button("💳 Pay Securely with Paddle (Pro)", checkout_url)
+            else:
+                st.warning("⚠️ Payment gateway currently unavailable.")
+
+    with col3:
+        st.markdown("""
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 20px; border-radius: 12px; text-align: center;">
+            <h2 style="color: white;">Enterprise</h2>
+            <h1 style="color: #60a5fa;">$500<span style="font-size: 14px; color: gray;">/mo</span></h1>
+            <p>For global shipping hubs.</p>
+            <hr style="border-color: rgba(96, 165, 250, 0.3);">
+            <ul style="text-align: left; color: white;">
+                <li><b>Unlimited</b> Invoice Scans</li>
+                <li>Full ERP Webhook Access</li>
+                <li>24/7 Dedicated Account Rep</li>
+                <li>Custom SLA Agreements</li>
+            </ul>
+        </div>
+        <br>
+        """, unsafe_allow_html=True)
+        if user_tier == "Enterprise":
+            st.button("Current Plan", disabled=True, key="btn_ent_cur_billing")
+        else:
+            checkout_url_ent = create_paddle_checkout(
+                "Enterprise", ENTERPRISE_PRICE_ID, st.session_state["username"], PADDLE_API_KEY
+            )
+            if checkout_url_ent:
+                st.link_button("💳 Pay Securely with Paddle (Enterprise)", checkout_url_ent)
+            else:
+                st.warning("⚠️ Payment gateway currently unavailable.")
+
+
+def _render_review_queue(df_all: pd.DataFrame) -> None:
+    """Render the manual review queue page."""
+    st.subheader("🔍 Human-in-the-Loop Manual Review Queue")
+    df_pending = df_all[df_all['review_status'] == 'Pending Review']
+    if not df_pending.empty:
+        for idx, row in df_pending.iterrows():
+            with st.expander(
+                f"📁 File: {row['filename']} | 📦 Container: {row['container_no']} | 🚦 Status: {row['status']}"
+            ):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_track = st.text_input(f"Tracking ID #{row['id']}", value=row['tracking_id'])
+                    new_cont = st.text_input(f"Container No #{row['id']}", value=row['container_no'])
+                with col2:
+                    new_port = st.text_input(f"Port #{row['id']}", value=row['port'])
+                    new_status = st.selectbox(
+                        f"Audit Status #{row['id']}",
+                        ["✅ Approved", "⚠️ Freight Discrepancy", "⚠️ Customs Discrepancy"],
+                        index=0 if row['status'] == "✅ Approved" else 1
+                    )
+
+                if st.button(f"Verify & Commit Record #{row['id']}", key=f"btn_{row['id']}"):
+                    update_audit_record(row['id'], new_track, new_cont, new_port, new_status)
+                    log_activity(
+                        st.session_state["username"],
+                        st.session_state["workspace"],
+                        "VERIFY_RECORD",
+                        row['id']
+                    )
+                    st.toast(f"Record #{row['id']} verified!", icon="💾")
+                    st.rerun()
+    else:
+        st.success("🎉 No pending invoices in your review queue. All records are verified!")
+
+
+def _render_dispute_generator(df_all: pd.DataFrame) -> None:
+    """Render the dispute letter generator page."""
+    st.subheader("⚖️ Automated Dispute Letter Generator")
+    df_disputes = df_all[df_all['status'] != '✅ Approved']
+    if not df_disputes.empty:
+        for _, row in df_disputes.iterrows():
+            st.markdown(
+                f"**File:** {row['filename']} | **Container:** {row['container_no']} | **Status:** {row['status']}"
+            )
+            pdf_dispute = generate_dispute_letter_pdf(
+                row['filename'], row['tracking_id'], row['container_no'], row['status']
+            )
+            st.download_button(
+                label=f"📄 Download Legal Dispute Notice ({row['filename']})",
+                data=pdf_dispute,
+                file_name=f"dispute_notice_{row['container_no']}.pdf",
+                mime='application/pdf',
+                key=f"dispute_{row['id']}"
+            )
+            st.markdown("---")
+    else:
+        st.info("No flagged discrepancies found for dispute generation.")
+
+
+def _render_iot_tracking(df_all: pd.DataFrame) -> None:
+    """Render the IoT GPS tracking page."""
+    st.subheader("🛰️ IoT GPS & Live Carrier Tracking (DHL / Aramex API)")
+    carrier_choice = st.selectbox("Select Carrier for Live Tracking Query", ["DHL", "Aramex", "Maersk"])
+    query_track = st.text_input("Enter Tracking ID or Container No to Live Query")
+    if st.button("Query Live Carrier API"):
+        st.success(f"📡 API Response: {fetch_live_carrier_tracking(query_track, carrier_choice)}")
+
+    if not df_all.empty:
+        df_iot = df_all[['container_no', 'port', 'date', 'status', 'iot_status']]
+        st.dataframe(df_iot, use_container_width=True)
+
+
+def _render_cfo_workflow(df_all: pd.DataFrame) -> None:
+    """Render the CFO approval workflow page."""
+    st.subheader("👔 Multi-Tier CFO Approval Workflow")
+    if has_permission(st.session_state["role"], "approve_cfo"):
+        df_cfo = df_all[df_all['status'] != '✅ Approved']
+        if not df_cfo.empty:
+            for _, row in df_cfo.iterrows():
+                st.markdown(
+                    f"**Container:** {row['container_no']} | **Status:** {row['status']} | "
+                    f"**CFO Status:** {row['cfo_approval']}"
+                )
+                if st.button(f"✍️ CFO Digital Sign & Approve #{row['id']}", key=f"cfo_{row['id']}"):
+                    approve_cfo_record(row['id'])
+                    log_activity(
+                        st.session_state["username"],
+                        st.session_state["workspace"],
+                        "CFO_APPROVE",
+                        row['id']
+                    )
+                    st.toast(f"Discrepancy #{row['id']} approved by CFO!", icon="✍️")
+                    st.rerun()
+        else:
+            st.success("🎉 No high-value discrepancies pending CFO approval.")
+    else:
+        st.warning("Unauthorized: Only CFO or Admin roles can access the approval workflow.")
+
+
+def _render_ai_assistant(df_all: pd.DataFrame) -> None:
+    """Render the AI voice/text assistant page."""
+    st.subheader("🎙️ AI Voice & Text Audit Assistant")
+    user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
+    if st.button("Ask AI"):
+        if "leakage" in user_query.lower() or "هدر" in user_query.lower():
+            disc = len(df_all[df_all["status"] != "✅ Approved"])
+            st.info(
+                f"🤖 AI Assistant: Based on your workspace database, you have {disc} flagged discrepancies "
+                f"with an estimated financial leakage impact of ${disc * 450:,.2f}."
+            )
+        else:
+            st.info(
+                "🤖 AI Assistant: All workspace audit logs are synchronized and fully operational. "
+                "No critical risks detected."
+            )
+
+
+def _render_audit_history(df_all: pd.DataFrame) -> None:
+    """Render the audit history page."""
+    st.subheader("🗄️ Enterprise Cloud Database Logs")
+    if not df_all.empty:
+        st.dataframe(df_all, use_container_width=True)
+        col_csv, col_pdf = st.columns(2)
+        with col_csv:
+            csv_history = df_all.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download History (CSV)",
+                data=csv_history,
+                file_name='audit_history.csv',
+                mime='text/csv'
+            )
+        with col_pdf:
+            pdf_buffer = generate_executive_pdf(
+                df_all, f"Immutable Audit Trails - Workspace: {st.session_state['workspace']}"
+            )
+            st.download_button(
+                label="📄 Download Executive Report (PDF)",
+                data=pdf_buffer,
+                file_name='audit_history_executive.pdf',
+                mime='application/pdf'
+            )
+    else:
+        st.info("No historical records found.")
+
+
+def _render_analytics(df_all: pd.DataFrame) -> None:
+    """Render the analytics and KPIs page."""
+    st.subheader("📈 Executive Logistics Analytics & KPIs")
+    if not df_all.empty:
+        total_audits = len(df_all)
+        approved_count = len(df_all[df_all["status"] == "✅ Approved"])
+        discrepancy_count = total_audits - approved_count
+        estimated_savings = discrepancy_count * 450.0
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Invoices Audited", total_audits)
+        col2.metric("Approved Invoices", approved_count)
+        col3.metric("Discrepancies Flagged", discrepancy_count)
+        col4.metric("Estimated Cost Savings", f"${estimated_savings:,.2f}")
+
+        st.markdown("---")
+        fig_pie = px.pie(
+            df_all,
+            names='status',
+            title='Audit Status Breakdown',
+            hole=0.4,
+            color_discrete_sequence=['#10b981', '#2563eb', '#f59e0b']
+        )
+        fig_pie.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font_color="white"
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+    else:
+        st.info("No data available for analytics yet.")
+
+
+def _render_alerts(df_all: pd.DataFrame) -> None:
+    """Render the alerts center page."""
+    st.subheader("🚨 Automated Discrepancy Alerts Center")
+    df_alerts = df_all[df_all['status'] != '✅ Approved']
+    if not df_alerts.empty:
+        st.error(f"⚠️ Total Active Discrepancy Alerts Requiring Attention: {len(df_alerts)}")
+        st.dataframe(df_alerts, use_container_width=True)
+    else:
+        st.success("🎉 Outstanding! No discrepancy alerts found.")
+
+
+def _render_scheduler(df_all: pd.DataFrame) -> None:
+    """Render the report scheduler page."""
+    st.subheader("📅 Automated Report Scheduler & Dispatcher")
+    if has_permission(st.session_state["role"], "schedule_reports"):
+        sched_email = st.text_input("Recipient Email for Scheduled Report", value=DEFAULT_CFO_EMAIL)
+
+        # Validate email before showing send button
+        if sched_email and not validate_email(sched_email):
+            st.warning("⚠️ Please enter a valid email address.")
+        elif st.button("🚀 Trigger & Send Immediate Executive Report"):
+            if send_automated_report(sched_email, df_all):
+                log_activity(
+                    st.session_state["username"],
+                    st.session_state["workspace"],
+                    "SEND_SCHEDULED_REPORT",
+                    sched_email
+                )
+                st.success("✅ Executive Report dispatched successfully via email!")
+            else:
+                st.error("❌ Failed to send report. Please verify email settings.")
+    else:
+        st.warning("Unauthorized: Only CFO or Admin roles can schedule or trigger automated reports.")
+
+
+def _render_vendor_assessment(df_all: pd.DataFrame) -> None:
+    """Render the vendor risk assessment page."""
+    st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
+    if not df_all.empty:
+        df_vendor = df_all.groupby(['username', 'workspace', 'status']).size().reset_index(name='count')
+        st.dataframe(df_vendor, use_container_width=True)
+    else:
+        st.info("No vendor assessment data available yet.")
+
+
+def _render_tariff_classifier() -> None:
+    """Render the customs tariff classifier page."""
+    st.subheader("🏷️ AI Customs Tariff & HS Code Auto-Classifier")
+    item_desc = st.text_input(
+        "Enter Goods Description (e.g., 'MacBook Pro M3 Laptop', 'Industrial Hydraulic Pump')"
+    )
+    if st.button("Calculate Tariff & Classify"):
+        st.success("✅ HS Code Classified: **8471.30 (Portable Digital Automatic Data Processing Machines)**")
+        st.info("Estimated Customs Duty: **5%** | Import VAT: **16%** | Standard Compliance: **Verified**")
+
+
+def _render_erp_integration() -> None:
+    """Render the ERP/webhook integration page."""
+    st.subheader("🔌 ERP & Webhook Integrations")
+    webhook_url = st.text_input(
+        "Enterprise ERP Webhook Endpoint URL",
+        value="https://api.yourcompany.com/erp/v1/webhooks/audit"
+    )
+
+    # Validate webhook URL
+    if webhook_url and not validate_webhook_url(webhook_url):
+        st.warning("⚠️ Please enter a valid webhook URL (must be HTTP/HTTPS).")
+    elif st.button("🧪 Test Webhook & Sync Verified Audits"):
+        if test_webhook_connection(webhook_url):
             log_activity(st.session_state["username"], st.session_state["workspace"], "TEST_ERP_WEBHOOK")
             st.success("Webhook test dispatched successfully! Server responded with status code: 200 (Simulated)")
 
+
 render_active_view(app_mode, legal_mode)
-# start
-  
