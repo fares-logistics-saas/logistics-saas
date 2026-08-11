@@ -115,8 +115,8 @@ st.markdown(get_styles_css(), unsafe_allow_html=True)
 # --- Sidebar Logo ---
 st.sidebar.markdown(get_logo_html(), unsafe_allow_html=True)
 
-# Hidden button for logo click handling
-if st.sidebar.button("Toggle_Logo_Hidden", key="logo_click_trigger"):
+# Hidden button for logo click handling (invisible via CSS, triggered by logo click via JS)
+if st.sidebar.button("​", key="logo_click_trigger"):  # Zero-width space label
     if st.session_state["view"] == "dashboard":
         st.session_state["return_category"] = st.session_state.get("current_active_category")
         st.session_state["return_mode"] = st.session_state.get("current_active_mode")
