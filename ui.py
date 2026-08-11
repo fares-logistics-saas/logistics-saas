@@ -26,6 +26,19 @@ def get_styles_css() -> str:
         display: none !important;
     }
 
+    /* Hide the logo click trigger button (used for logo navigation) */
+    button[data-testid="stBaseButton-secondary"]:has(p:empty),
+    button[data-testid="stBaseButton-secondary"] p:empty {
+        display: none !important;
+    }
+    [data-testid="stElementContainer"]:has(button[kind="secondary"] p:empty) {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
     html, body, [data-testid="stApp"], .stApp {
         background-color: #030712 !important;
         color: #f8fafc !important;
@@ -393,15 +406,41 @@ def get_logo_click_handler_js() -> str:
     """
     Get JavaScript for logo click handling.
     
+    The logo container is made clickable to trigger navigation to the about page.
+    This uses a hidden Streamlit button as a bridge since JavaScript cannot
+    directly invoke Python code.
+    
     Returns:
         HTML string with embedded JavaScript.
     """
-    return """<div style='display:none;'><img src='x' onerror="setTimeout(()=>{let c=document.querySelector('.custom-logo-container');let b=Array.from(document.querySelectorAll('button')).find(x=>x.innerText.includes('Toggle_Logo_Hidden'));if(b){let p=b.closest('[data-testid=\\'stElementContainer\\']');if(p)p.style.display='none';}if(c&&b){c.style.cursor='pointer';c.onclick=()=>b.click();}},50);"></div>"""
+    return """<div style='display:none;'><img src='x' onerror="setTimeout(()=>{
+        let c=document.querySelector('.custom-logo-container');
+        // Find the hidden button by its key attribute (rendered as data-testid or similar)
+        let buttons=document.querySelectorAll('section[data-testid=stSidebar] button');
+        let b=null;
+        for(let btn of buttons){
+            // Find button with empty or zero-width space content
+            let txt=btn.textContent.trim();
+            if(txt===''||txt==='\\u200B'){b=btn;break;}
+        }
+        if(b){
+            let p=b.closest('[data-testid=\\'stElementContainer\\']');
+            if(p){p.style.display='none';p.style.height='0';p.style.overflow='hidden';}
+        }
+        if(c&&b){c.style.cursor='pointer';c.onclick=()=>b.click();}
+    },50);"></div>"""
 
 
 def render_about_page() -> None:
     """Render the about/landing page."""
     st.markdown(get_about_page_html(), unsafe_allow_html=True)
+    
+    # JavaScript to make the about page logo clickable (triggers the dashboard button)
+    st.markdown("""<div style='display:none;'><img src='x' onerror="setTimeout(function(){
+        var aboutLogo=document.getElementById('about-main-logo');
+        var dashBtn=document.querySelector('button[data-testid=stBaseButton-primary]');
+        if(aboutLogo&&dashBtn){aboutLogo.style.cursor='pointer';aboutLogo.onclick=function(){dashBtn.click();};}
+    },100);"></div>""", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns(3)
     
