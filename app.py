@@ -35,6 +35,7 @@ from database import (
     save_audit_record,
     update_audit_record,
     approve_cfo_record,
+    check_grace_period_access,
     engine,
 )
 from auth import (
@@ -108,6 +109,79 @@ except Exception:
 
 # --- Initialize Database ---
 init_db()
+
+
+def render_tier_lock_message(feature_name: str, feature_id: str, required_tier: str) -> bool:
+    """
+    Render a tier lock message with grace period handling and upgrade button.
+    
+    Args:
+        feature_name: Human-readable name of the locked feature.
+        feature_id: Feature identifier for grace period check.
+        required_tier: The tier required to access this feature ('Pro' or 'Enterprise').
+        
+    Returns:
+        True if user should be blocked (no access), False if user can proceed.
+    """
+    user_tier, _ = get_user_sub_info(st.session_state["username"])
+    
+    # Check if user already has required tier
+    if required_tier == "Pro" and user_tier in ["Pro", "Enterprise"]:
+        return False
+    if required_tier == "Enterprise" and user_tier == "Enterprise":
+        return False
+    
+    # Check grace period access for existing users
+    has_grace, days_remaining = check_grace_period_access(
+        st.session_state["username"],
+        feature_id,
+        user_tier
+    )
+    
+    if has_grace and days_remaining > 0:
+        # User has grace period access - show warning but allow access
+        st.warning(
+            f"⏰ **Grace Period Access**: You have temporary access to this {required_tier} feature "
+            f"as an existing user. Your grace period expires in **{days_remaining} days**. "
+            f"Upgrade to {required_tier} to retain access."
+        )
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button(f"⬆️ Upgrade to {required_tier}", key=f"grace_upgrade_{feature_id}", use_container_width=True, type="primary"):
+                # Navigate to billing page
+                st.session_state["legal_selection"] = "App Dashboard"
+                st.session_state["main_cat_choice"] = "💼 Finance"
+                st.session_state["radio_fin"] = "💎 Billing & Subscriptions"
+                st.rerun()
+        return False  # Allow access during grace period
+    
+    # User is locked out - show upgrade message
+    tier_emoji = "🚀" if required_tier == "Pro" else "💎"
+    st.warning(
+        f"🔒 **{required_tier} Feature**: {feature_name} is available on the "
+        f"{required_tier} plan and above."
+    )
+    
+    st.info(
+        f"Upgrade to {required_tier} to unlock this feature and enhance your logistics auditing capabilities."
+    )
+    
+    # Prominent upgrade button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button(
+            f"{tier_emoji} Upgrade to {required_tier}",
+            type="primary",
+            use_container_width=True,
+            key=f"upgrade_btn_{feature_id}"
+        ):
+            # Navigate to billing page
+            st.session_state["legal_selection"] = "App Dashboard"
+            st.session_state["main_cat_choice"] = "💼 Finance"
+            st.session_state["radio_fin"] = "💎 Billing & Subscriptions"
+            st.rerun()
+    
+    return True  # Block access
 
 # --- Apply UI Styling ---
 st.markdown(get_styles_css(), unsafe_allow_html=True)
@@ -183,18 +257,26 @@ _user_tier = "Free"
 if st.session_state.get("logged_in"):
     _user_tier, _ = get_user_sub_info(st.session_state["username"])
 
-# Build tier-aware navigation categories
-# Core workflow always visible: Upload → Review → Approve → Reports
-# Advanced features in Settings (Pro+), Enterprise features (Enterprise only)
-_available_categories = [lang["cat_ops"], lang["cat_rep"]]
+# Build navigation categories - all visible but with upgrade indicators
+# Core workflow always visible: Upload → Review → Reports
+# Finance category visible to all (Pro+ required, but shows upgrade prompt)
+# Advanced category visible to all (Enterprise required, but shows upgrade prompt)
+_available_categories = [lang["cat_ops"]]
 
-# Pro+ users see Finance category
+# Finance category - always visible, but show indicator for Free users
 if _user_tier in ["Pro", "Enterprise"]:
-    _available_categories.insert(1, lang["cat_fin"])
+    _available_categories.append(lang["cat_fin"])
+else:
+    _available_categories.append(lang["cat_fin"] + " 🔒")
 
-# Enterprise users see Advanced/Settings category with integrations
+# Reports category - always visible
+_available_categories.append(lang["cat_rep"])
+
+# Advanced category - always visible, but show indicator for non-Enterprise
 if _user_tier == "Enterprise":
     _available_categories.append(lang["cat_sys"])
+else:
+    _available_categories.append(lang["cat_sys"] + " 🔒")
 
 category_choice = st.sidebar.selectbox(
     "Select Category",
@@ -204,7 +286,10 @@ category_choice = st.sidebar.selectbox(
     on_change=reset_legal_view
 )
 
-if category_choice == lang["cat_ops"]:
+# Normalize category choice (remove lock indicator for comparison)
+_category_base = category_choice.replace(" 🔒", "")
+
+if _category_base == lang["cat_ops"]:
     # Core workflow: Upload → Review (simplified from 3 items)
     # IoT/GPS Tracking moved to Enterprise-only Advanced section
     _ops_items = [lang["nav_process"], lang["nav_review"]]
@@ -214,21 +299,29 @@ if category_choice == lang["cat_ops"]:
         key="radio_ops",
         on_change=reset_legal_view
     )
-elif category_choice == lang["cat_fin"]:
-    # Finance: Billing, Dispute, CFO Approval (Pro+ only)
-    _fin_items = [lang["nav_billing"], lang["nav_dispute"], lang["nav_workflow"]]
+elif _category_base == lang["cat_fin"]:
+    # Finance: Billing, Dispute, CFO Approval
+    # All items visible, but some show lock for Free tier
+    _fin_items = [lang["nav_billing"]]
+    if _user_tier == "Free":
+        _fin_items.append(lang["nav_dispute"] + " 🔒")
+        _fin_items.append(lang["nav_workflow"] + " 🔒")
+    else:
+        _fin_items.append(lang["nav_dispute"])
+        _fin_items.append(lang["nav_workflow"])
     app_mode = st.sidebar.radio(
         "Finance",
         _fin_items,
         key="radio_fin",
         on_change=reset_legal_view
     )
-elif category_choice == lang["cat_rep"]:
-    # Reports: Analytics, Alerts, History (simplified for all tiers)
-    # Scheduler moved to Enterprise-only
+elif _category_base == lang["cat_rep"]:
+    # Reports: Analytics, Alerts, History + Scheduler
     _rep_items = [lang["nav_kpi"], lang["nav_alerts"], lang["nav_history"]]
     if _user_tier == "Enterprise":
         _rep_items.append(lang["nav_scheduler"])
+    else:
+        _rep_items.append(lang["nav_scheduler"] + " 🔒")
     app_mode = st.sidebar.radio(
         "Reports",
         _rep_items,
@@ -236,21 +329,32 @@ elif category_choice == lang["cat_rep"]:
         on_change=reset_legal_view
     )
 else:
-    # Advanced/Integrations (Enterprise only)
-    # Contains: AI Assistant, IoT Tracking, Vendor Assessment, Tariff Classifier, ERP Integration
-    _sys_items = [
-        lang["nav_voice"],
-        lang["nav_iot"],
-        "Vendor Risk Assessment",
-        lang["nav_tariff"],
-        lang["nav_erp"]
-    ]
+    # Advanced/Integrations - all items visible with lock indicators for non-Enterprise
+    if _user_tier == "Enterprise":
+        _sys_items = [
+            lang["nav_voice"],
+            lang["nav_iot"],
+            "Vendor Risk Assessment",
+            lang["nav_tariff"],
+            lang["nav_erp"]
+        ]
+    else:
+        _sys_items = [
+            lang["nav_voice"] + " 🔒",
+            lang["nav_iot"] + " 🔒",
+            "Vendor Risk Assessment 🔒",
+            lang["nav_tariff"] + " 🔒",
+            lang["nav_erp"] + " 🔒"
+        ]
     app_mode = st.sidebar.radio(
         "Advanced",
         _sys_items,
         key="radio_sys",
         on_change=reset_legal_view
     )
+
+# Normalize app_mode (remove lock indicator for routing)
+app_mode = app_mode.replace(" 🔒", "")
 
 # Track current page for logo click restore
 st.session_state["current_active_category"] = category_choice
@@ -789,14 +893,12 @@ def _render_dispute_generator(df_all: pd.DataFrame) -> None:
     """Render the dispute letter generator page (Pro+ feature)."""
     st.subheader("⚖️ Automated Dispute Letter Generator")
     
-    # Check tier - this is a Pro+ feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier == "Free":
-        st.warning(
-            "🔒 **Pro Feature**: Automated dispute letter generation with legal templates "
-            "is available on Pro and Enterprise plans. Upgrade to generate formal dispute notices."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is a Pro+ feature with grace period support
+    if render_tier_lock_message(
+        "Automated dispute letter generation with legal templates",
+        "dispute_generator",
+        "Pro"
+    ):
         return
     
     df_disputes = df_all[df_all['status'] != '✅ Approved']
@@ -824,14 +926,12 @@ def _render_iot_tracking(df_all: pd.DataFrame) -> None:
     """Render the IoT GPS tracking page (Enterprise feature)."""
     st.subheader("🛰️ IoT GPS & Live Carrier Tracking (DHL / Aramex API)")
     
-    # Check tier - this is an Enterprise feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier != "Enterprise":
-        st.warning(
-            "🔒 **Enterprise Feature**: Live carrier GPS tracking and IoT integration is available "
-            "on the Enterprise plan. Upgrade to unlock real-time shipment visibility."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is an Enterprise feature with grace period support
+    if render_tier_lock_message(
+        "Live carrier GPS tracking and IoT integration for real-time shipment visibility",
+        "iot_tracking",
+        "Enterprise"
+    ):
         return
     
     carrier_choice = st.selectbox("Select Carrier for Live Tracking Query", ["DHL", "Aramex", "Maersk"])
@@ -848,14 +948,12 @@ def _render_cfo_workflow(df_all: pd.DataFrame) -> None:
     """Render the CFO approval workflow page (Pro+ feature)."""
     st.subheader("👔 Multi-Tier CFO Approval Workflow")
     
-    # Check tier - this is a Pro+ feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier == "Free":
-        st.warning(
-            "🔒 **Pro Feature**: CFO digital approval workflow with multi-tier sign-off "
-            "is available on Pro and Enterprise plans. Upgrade for executive approval tracking."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is a Pro+ feature with grace period support
+    if render_tier_lock_message(
+        "CFO digital approval workflow with multi-tier sign-off for executive approval tracking",
+        "cfo_workflow",
+        "Pro"
+    ):
         return
     
     if has_permission(st.session_state["role"], "approve_cfo"):
@@ -886,14 +984,12 @@ def _render_ai_assistant(df_all: pd.DataFrame) -> None:
     """Render the AI voice/text assistant page (Enterprise feature)."""
     st.subheader("🎙️ AI Voice & Text Audit Assistant")
     
-    # Check tier - this is an Enterprise feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier != "Enterprise":
-        st.warning(
-            "🔒 **Enterprise Feature**: The AI-powered audit assistant with natural language queries "
-            "is available on the Enterprise plan. Upgrade to ask questions about your logistics data."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is an Enterprise feature with grace period support
+    if render_tier_lock_message(
+        "AI-powered audit assistant with natural language queries for logistics data",
+        "ai_assistant",
+        "Enterprise"
+    ):
         return
     
     user_query = st.text_input("Ask AI Auditor (e.g., 'What is our total financial leakage this week?')")
@@ -987,14 +1083,12 @@ def _render_scheduler(df_all: pd.DataFrame) -> None:
     """Render the report scheduler page (Enterprise feature)."""
     st.subheader("📅 Automated Report Scheduler & Dispatcher")
     
-    # Check tier - this is an Enterprise feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier != "Enterprise":
-        st.warning(
-            "🔒 **Enterprise Feature**: Automated report scheduling and email dispatch "
-            "is available on the Enterprise plan. Upgrade for scheduled executive reports."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is an Enterprise feature with grace period support
+    if render_tier_lock_message(
+        "Automated report scheduling and email dispatch for scheduled executive reports",
+        "scheduler",
+        "Enterprise"
+    ):
         return
     
     if has_permission(st.session_state["role"], "schedule_reports"):
@@ -1022,14 +1116,12 @@ def _render_vendor_assessment(df_all: pd.DataFrame) -> None:
     """Render the vendor risk assessment page (Enterprise feature)."""
     st.subheader("🏢 Enterprise Vendor Risk & Compliance Assessment")
     
-    # Check tier - this is an Enterprise feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier != "Enterprise":
-        st.warning(
-            "🔒 **Enterprise Feature**: Vendor risk scoring and compliance assessment analytics "
-            "is available on the Enterprise plan. Upgrade to evaluate vendor performance."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is an Enterprise feature with grace period support
+    if render_tier_lock_message(
+        "Vendor risk scoring and compliance assessment analytics for vendor performance evaluation",
+        "vendor_assessment",
+        "Enterprise"
+    ):
         return
     
     if not df_all.empty:
@@ -1043,14 +1135,12 @@ def _render_tariff_classifier() -> None:
     """Render the customs tariff classifier page (Enterprise feature)."""
     st.subheader("🏷️ AI Customs Tariff & HS Code Auto-Classifier")
     
-    # Check tier - this is an Enterprise feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier != "Enterprise":
-        st.warning(
-            "🔒 **Enterprise Feature**: AI-powered customs tariff classification and HS code lookup "
-            "is available on the Enterprise plan. Upgrade for automated import duty calculations."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is an Enterprise feature with grace period support
+    if render_tier_lock_message(
+        "AI-powered customs tariff classification and HS code lookup for automated import duty calculations",
+        "tariff_classifier",
+        "Enterprise"
+    ):
         return
     
     item_desc = st.text_input(
@@ -1065,14 +1155,13 @@ def _render_erp_integration() -> None:
     """Render the ERP/webhook integration page (Enterprise feature)."""
     st.subheader("🔌 ERP & Webhook Integrations")
     
-    # Check tier - this is an Enterprise feature
-    user_tier, _ = get_user_sub_info(st.session_state["username"])
-    if user_tier != "Enterprise":
-        st.warning(
-            "🔒 **Enterprise Feature**: Direct ERP webhook integration with SAP, Oracle, and NetSuite "
-            "is available on the Enterprise plan. Upgrade for automated data synchronization."
-        )
-        st.info("Navigate to **Finance → Billing & Subscriptions** to upgrade your plan.")
+    # Check tier - this is an Enterprise feature with grace period support
+    if render_tier_lock_message(
+        "Direct ERP webhook integration with SAP, Oracle, and NetSuite for automated data synchronization",
+        "erp_integration",
+        "Enterprise"
+    ):
+        return
         return
     
     webhook_url = st.text_input(

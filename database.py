@@ -20,6 +20,10 @@ from config import (
     DEFAULT_IOT_STATUS,
     DEFAULT_CFO_APPROVAL,
     DEFAULT_REVIEW_STATUS,
+    TIER_LOCK_CHANGE_DATE,
+    GRACE_PERIOD_DAYS,
+    PRO_FEATURES,
+    ENTERPRISE_FEATURES,
     logger,
 )
 
@@ -78,6 +82,7 @@ def _create_sqlite_tables(conn: sqlalchemy.Connection) -> None:
     """))
     # Note: mfa_code column is kept for backward compatibility but no longer has
     # a default value of '1234'. NULL means MFA is not configured for the user.
+    # created_at tracks when user was created for grandfathering/grace period logic.
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -86,7 +91,8 @@ def _create_sqlite_tables(conn: sqlalchemy.Connection) -> None:
             workspace TEXT DEFAULT 'Default Corp',
             mfa_code TEXT,
             subscription_tier TEXT DEFAULT 'Free',
-            invoices_processed INTEGER DEFAULT 0
+            invoices_processed INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """))
     conn.execute(text("""
@@ -126,6 +132,7 @@ def _create_postgres_tables(conn: sqlalchemy.Connection) -> None:
     """))
     # Note: mfa_code column is kept for backward compatibility but no longer has
     # a default value of '1234'. NULL means MFA is not configured for the user.
+    # created_at tracks when user was created for grandfathering/grace period logic.
     conn.execute(text("""
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -134,7 +141,8 @@ def _create_postgres_tables(conn: sqlalchemy.Connection) -> None:
             workspace TEXT DEFAULT 'Default Corp',
             mfa_code TEXT,
             subscription_tier TEXT DEFAULT 'Free',
-            invoices_processed INTEGER DEFAULT 0
+            invoices_processed INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """))
     conn.execute(text("""
@@ -161,6 +169,8 @@ def _run_migrations(eng: sqlalchemy.Engine) -> None:
         "ALTER TABLE users ADD COLUMN mfa_code TEXT",
         "ALTER TABLE users ADD COLUMN subscription_tier TEXT DEFAULT 'Free'",
         "ALTER TABLE users ADD COLUMN invoices_processed INTEGER DEFAULT 0",
+        # created_at for grandfathering - existing users get pre-change date
+        "ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT '2026-01-01 00:00:00'",
         "ALTER TABLE audits ADD COLUMN hs_code TEXT",
         "ALTER TABLE audits ADD COLUMN stamp_status TEXT",
         "ALTER TABLE audits ADD COLUMN iot_status TEXT DEFAULT 'GPS Active (On Schedule)'",
@@ -444,3 +454,100 @@ def approve_cfo_record(record_id: int) -> None:
     except Exception as e:
         db_logger.error(f"Failed to approve CFO record: {record_id}", exc_info=True)
         st.error("Unable to process CFO approval. Please try again.")
+
+
+def get_user_created_at(username: str) -> Optional[str]:
+    """
+    Get the creation timestamp for a user.
+    
+    Args:
+        username: The username to look up.
+        
+    Returns:
+        ISO format date string of when user was created, or None if not found.
+    """
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT created_at FROM users WHERE username = :u"),
+                {"u": username}
+            ).fetchone()
+            if result and result[0]:
+                return str(result[0])
+    except Exception as e:
+        db_logger.error(f"Failed to get created_at for user: {username}", exc_info=True)
+    return None
+
+
+def check_grace_period_access(username: str, feature: str, user_tier: str) -> Tuple[bool, int]:
+    """
+    Check if a user has grace period access to a tier-locked feature.
+    
+    Users created before the tier-lock change date (2026-08-11) get temporary access
+    to features they previously had access to, for a grace period of 90 days.
+    
+    Args:
+        username: The username to check.
+        feature: The feature identifier (e.g., 'dispute_generator', 'iot_tracking').
+        user_tier: The user's current subscription tier.
+        
+    Returns:
+        Tuple of (has_grace_access, days_remaining).
+        has_grace_access is True if user can access the feature via grandfathering.
+        days_remaining is the number of days left in grace period (0 if expired).
+    """
+    from datetime import datetime, timedelta
+    
+    # Check if feature requires higher tier than user has
+    required_tier = None
+    if feature in PRO_FEATURES and user_tier == "Free":
+        required_tier = "Pro"
+    elif feature in ENTERPRISE_FEATURES and user_tier != "Enterprise":
+        required_tier = "Enterprise"
+    
+    if required_tier is None:
+        # User already has required tier
+        return True, 0
+    
+    # Get user creation date
+    created_at = get_user_created_at(username)
+    if not created_at:
+        return False, 0
+    
+    try:
+        # Parse dates
+        change_date = datetime.strptime(TIER_LOCK_CHANGE_DATE, "%Y-%m-%d")
+        
+        # Handle various datetime formats
+        user_created = None
+        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"]:
+            try:
+                user_created = datetime.strptime(created_at.split('.')[0].replace('T', ' '), "%Y-%m-%d %H:%M:%S")
+                break
+            except ValueError:
+                continue
+        
+        if user_created is None:
+            # Fallback: try just the date portion
+            try:
+                user_created = datetime.strptime(created_at[:10], "%Y-%m-%d")
+            except ValueError:
+                return False, 0
+        
+        # Check if user was created before the tier-lock change
+        if user_created >= change_date:
+            return False, 0
+        
+        # Calculate grace period end date
+        grace_end = change_date + timedelta(days=GRACE_PERIOD_DAYS)
+        today = datetime.now()
+        
+        if today > grace_end:
+            return False, 0
+        
+        days_remaining = (grace_end - today).days
+        return True, max(0, days_remaining)
+        
+    except Exception as e:
+        db_logger.error(f"Failed to check grace period for user {username}: {e}", exc_info=True)
+        return False, 0

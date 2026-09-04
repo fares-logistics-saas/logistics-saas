@@ -44,6 +44,20 @@ PLAN_LIMITS: Dict[str, float] = {
     "Enterprise": float('inf')
 }
 
+# --- Tier-Lock Grace Period Configuration ---
+# Date when tier-based feature restrictions were introduced (B2B workflow change)
+# Users created before this date get temporary access to features they previously had
+TIER_LOCK_CHANGE_DATE = "2026-08-11"
+
+# Grace period duration in days - existing users get this many days to upgrade
+GRACE_PERIOD_DAYS = 90
+
+# Features that require Pro+ tier (previously available to all users)
+PRO_FEATURES = ["dispute_generator", "cfo_workflow"]
+
+# Features that require Enterprise tier (previously available to lower tiers)
+ENTERPRISE_FEATURES = ["iot_tracking", "ai_assistant", "scheduler", "vendor_assessment", "tariff_classifier", "erp_integration"]
+
 # --- Default Values ---
 DEFAULT_WORKSPACE = "Default Corp"
 DEFAULT_SUBSCRIPTION_TIER = "Free"
